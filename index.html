@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Анатомія FPV-дрона</title>
+<meta name="description" content="Інтерактивна 3D-будова 5″ FPV-дрона: клікабельні вузли з описом і видами, анімації моторів, польотного контролера й ELRS-приймача, конфігуратор компонентів.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7 7L25 25M25 7L7 25' stroke='%23232826' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='7' cy='7' r='5' fill='%23E8A200'/%3E%3Ccircle cx='25' cy='7' r='5' fill='%23E8A200'/%3E%3Ccircle cx='7' cy='25' r='5' fill='%23E8A200'/%3E%3Ccircle cx='25' cy='25' r='5' fill='%23E8A200'/%3E%3Crect x='12' y='11' width='8' height='10' rx='2' fill='%23232826'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="wrap">
+
+
+  <main class="layout">
+  <header class="top">
+    <div>
+      <p class="eyebrow">5″ фрістайл-квадрокоптер · 12 вузлів · нумерація моторів Betaflight</p>
+      <h1>Анатомія <span>FPV</span>-дрона</h1>
+    </div>
+    <p class="lede">Наведіть або торкніться деталі — з’явиться підказка. Клік виносить вузол на передній план, подвійний клік відкриває повний опис з видами компонента. Нижче — специфікація, анімації моторів, польотника й приймача та конфігуратор: міняйте компоненти й дивіться, як змінюються маса, тяга й час польоту.</p>
+  </header>
+    <section class="stage" id="stage" aria-label="3D-модель дрона">
+      <canvas id="gl" role="img" aria-label="3D-модель FPV-дрона. Тягніть, щоб обертати; колесо миші або щипок — масштаб."></canvas>
+      <div class="labels" id="labels" aria-hidden="true"></div>
+      <svg class="leader off" id="leader" aria-hidden="true"><line id="leadLine" x1="0" y1="0" x2="0" y2="0"></line><circle id="leadDot" r="4.5" cx="0" cy="0"></circle></svg>
+
+      <div class="peek" id="peek" aria-live="polite">
+        <div class="pk-top"><span class="badge" id="pkN">1</span><span class="pk-cat" id="pkCat"></span></div>
+        <h3 id="pkName"></h3>
+        <p id="pkShort"></p>
+        <dl class="pk-specs" id="pkSpecs"></dl>
+        <div class="pk-foot"><span class="pk-hint">Подвійний клік — повний опис</span><button class="lnk" id="pkMore" type="button">Детально</button></div>
+      </div>
+
+      <div class="tools" role="toolbar" aria-label="Керування виглядом">
+        <button class="tbtn" id="tTour" type="button" aria-pressed="false"><span class="t-lg">Тур по вузлах</span><span class="t-sm">Тур</span></button>
+        <button class="tbtn" id="tExplode" type="button" aria-pressed="false">Розібрати</button>
+        <button class="tbtn" id="tSignals" type="button" aria-pressed="false">Сигнали</button>
+        <button class="tbtn" id="tSpin" type="button" aria-pressed="true">Обертання</button>
+        <button class="tbtn" id="tReset" type="button"><span class="t-lg">Скинути вигляд</span><span class="t-sm">Скинути</span></button>
+        <div class="tour" id="tourBar" hidden>
+        <button id="tourPrev" type="button" aria-label="Попередній вузол">‹</button>
+        <span id="tourPos">1 / 12</span>
+        <button id="tourNext" type="button" aria-label="Наступний вузол">›</button>
+      </div>
+      </div>
+      <div class="legend" id="legend" hidden>
+        <span><i style="--c: var(--sig-power)"></i>Живлення</span>
+        <span><i style="--c: var(--sig-ctrl)"></i>Керування · CRSF</span>
+        <span><i style="--c: var(--sig-motor)"></i>Мотори · DShot</span>
+        <span><i style="--c: var(--sig-video)"></i>Відео</span>
+      </div>
+      <div class="status" id="status" hidden></div>
+      <p class="hint" id="hint"><span class="t-lg">Наведіть — підказка · клік — фокус · подвійний клік — опис · тягніть — обертати</span><span class="t-sm">Тап — фокус · двічі — опис · тягніть — обертати</span></p>
+      <div class="fallback" id="fallback" hidden>3D-сцена не запустилась: браузер не підтримує WebGL. Специфікація, описи й конфігуратор праворуч працюють.</div>
+    </section>
+
+    <div class="rail">
+      <section class="block" id="build" aria-labelledby="hBuild">
+        <div class="bhead"><h2 id="hBuild">Будова</h2><p class="eyebrow">Специфікація · маса</p></div>
+        <ol class="bom" id="bom"></ol>
+      </section>
+
+      <section class="block" id="demos" aria-labelledby="hDemos">
+        <div class="bhead"><h2 id="hDemos">Анімації</h2><p class="eyebrow">3D-сцена реагує</p></div>
+
+        <div class="demo" id="dMot">
+          <div class="demo-h"><h3>Мотори</h3><span class="ro" id="motRo">зупинені</span></div>
+          <div class="seg" role="group" aria-label="Анімація моторів">
+            <button type="button" data-mot="in" aria-pressed="false">Props In</button>
+            <button type="button" data-mot="out" aria-pressed="false">Props Out (реверс)</button>
+            <button type="button" data-mot="test" aria-pressed="false">Тест 1→2→3→4</button>
+            <button type="button" data-mot="stop" aria-pressed="false">Стоп</button>
+          </div>
+          <label class="slider" for="thr"><span>Газ</span><input type="range" id="thr" min="5" max="100" step="1" value="35"><output id="thrOut" for="thr">35 %</output></label>
+          <p class="note" id="motNote">Вигляд згори, ніс від пілота. <b>Props In</b> — стандарт Betaflight: M1 і M4 за годинниковою, M2 і M3 проти.</p>
+        </div>
+
+        <div class="demo" id="dFC">
+          <div class="demo-h"><h3>Польотний контролер <span class="leds"><i class="ledm red on" id="fcLedP" title="Живлення"></i><i class="ledm blue" id="fcLedS" title="Статус"></i></span></h3><span class="ro" id="fcRo">прошивка працює</span></div>
+          <div class="seg" role="group" aria-label="Режими польотного контролера">
+            <button type="button" data-fc="run" aria-pressed="true">Робочий режим</button>
+            <button type="button" data-fc="dfu" aria-pressed="false">Boot / DFU</button>
+            <button type="button" data-fc="flash" aria-pressed="false" disabled>Прошити</button>
+          </div>
+          <div class="prog" aria-hidden="true"><i id="fcProg"></i></div>
+          <p class="note" id="fcNote">Статусний світлодіод блимає: прошивка запущена, гіроскоп опитується тисячі разів на секунду.</p>
+        </div>
+
+        <div class="demo" id="dRX">
+          <div class="demo-h"><h3><span id="rxTitle">Приймач ELRS</span> <i class="ledm" id="rxLed" title="LED приймача"></i></h3><span class="ro" id="rxRo">немає зв’язку</span></div>
+          <div class="seg" role="group" aria-label="Стани приймача">
+            <button type="button" data-rx="nolink" aria-pressed="true">Немає зв’язку</button>
+            <button type="button" data-rx="bind" aria-pressed="false">Біндинг</button>
+            <button type="button" data-rx="linked" aria-pressed="false">Збінджено</button>
+            <button type="button" data-rx="wifi" aria-pressed="false">Wi-Fi</button>
+          </div>
+          <p class="note" id="rxNote">Повільне блимання (0,5 с) — приймач увімкнений, але не бачить пульта.</p>
+        </div>
+      </section>
+
+      <section class="block" id="config" aria-labelledby="hCfg">
+        <div class="bhead"><h2 id="hCfg">Конфігуратор</h2><p class="eyebrow">Оцінка в реальному часі</p></div>
+        <p class="sub">Замініть будь-який вузол — модель перебудується, а характеристики перерахуються.</p>
+        <div class="stats" id="stats"></div>
+        <div class="profile" id="profile"></div>
+        <ul class="warns" id="warns"></ul>
+        <div class="slots" id="slots"></div>
+      </section>
+      <p class="foot">Маса, тяга, струм і час польоту — інженерні оцінки для типових компонентів свого класу, а не паспортні дані конкретних моделей.</p>
+    </div>
+  </main>
+</div>
+
+<aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="drTitle" role="dialog">
+  <div class="dr-head">
+    <span class="badge" id="drN">1</span>
+    <div><p class="pk-cat" id="drCat"></p><h2 id="drTitle"></h2></div>
+    <button class="dr-x" id="drClose" type="button" aria-label="Закрити опис">×</button>
+  </div>
+  <div class="dr-body" id="drBody"></div>
+</aside>
+<div class="scrim" id="scrim" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="js/data.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/interaction.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
