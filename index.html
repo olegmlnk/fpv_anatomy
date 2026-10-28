@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Анатомія FPV-дрона</title>
-<meta name="description" content="Інтерактивна 3D-будова 5″ FPV-дрона: клікабельні вузли з описом і видами, анімації моторів, польотного контролера й ELRS-приймача, конфігуратор компонентів.">
+<title>Курс по БПЛА</title>
+<meta name="description" content="Інтерактивний курс з будови FPV-дронів: 3D-моделі 5″, 7″, 10″, гексакоптера й tiny whoop, покрокові ланцюжки сигналів і антенний стенд з розрахунком радіолінії.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7 7L25 25M25 7L7 25' stroke='%23232826' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='7' cy='7' r='5' fill='%23E8A200'/%3E%3Ccircle cx='25' cy='7' r='5' fill='%23E8A200'/%3E%3Ccircle cx='7' cy='25' r='5' fill='%23E8A200'/%3E%3Ccircle cx='25' cy='25' r='5' fill='%23E8A200'/%3E%3Crect x='12' y='11' width='8' height='10' rx='2' fill='%23232826'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,18 +13,26 @@
 </head>
 <body>
 <div class="wrap">
-
-
   <main class="layout">
   <header class="top">
     <div>
-      <p class="eyebrow">5″ фрістайл-квадрокоптер · 12 вузлів · нумерація моторів Betaflight</p>
-      <h1>Анатомія <span>FPV</span>-дрона</h1>
+      <p class="eyebrow">FPV-дрони · будова · сигнали · антени</p>
+      <h1>Курс по <span>БПЛА</span></h1>
     </div>
-    <p class="lede">Наведіть або торкніться деталі — з’явиться підказка. Клік виносить вузол на передній план, подвійний клік відкриває повний опис з видами компонента. Нижче — специфікація, анімації моторів, польотника й приймача та конфігуратор: міняйте компоненти й дивіться, як змінюються маса, тяга й час польоту.</p>
+    <p class="lede" id="lede"></p>
+    <nav class="modes" id="modeTabs" aria-label="Розділи курсу">
+      <button type="button" data-mode="build" aria-pressed="true">3D-будова</button>
+      <button type="button" data-mode="signals" aria-pressed="false">Сигнали</button>
+      <button type="button" data-mode="antennas" aria-pressed="false">Антени</button>
+    </nav>
+    <div class="plats" id="platRow">
+      <span class="lab-k">Платформа</span>
+      <div class="seg sm" id="platTabs" role="group" aria-label="Тип дрона"></div>
+      <span class="plat-name" id="platName"></span>
+    </div>
   </header>
-    <section class="stage" id="stage" aria-label="3D-модель дрона">
-      <canvas id="gl" role="img" aria-label="3D-модель FPV-дрона. Тягніть, щоб обертати; колесо миші або щипок — масштаб."></canvas>
+    <section class="stage" id="stage" aria-label="3D-сцена">
+      <canvas id="gl" role="img" aria-label="3D-модель дрона. Тягніть, щоб обертати; колесо миші або щипок — масштаб."></canvas>
       <div class="labels" id="labels" aria-hidden="true"></div>
       <svg class="leader off" id="leader" aria-hidden="true"><line id="leadLine" x1="0" y1="0" x2="0" y2="0"></line><circle id="leadDot" r="4.5" cx="0" cy="0"></circle></svg>
 
@@ -36,32 +44,31 @@
         <div class="pk-foot"><span class="pk-hint">Подвійний клік — повний опис</span><button class="lnk" id="pkMore" type="button">Детально</button></div>
       </div>
 
+      <div class="lab-hud" id="labHud" hidden aria-live="polite">
+        <div class="lh-top"><b id="lhV">—</b><span id="lhS"></span><i class="lh-q" id="lhQ"></i></div>
+        <div class="lh-meter" aria-hidden="true"><i id="lhBar"></i><b></b></div>
+        <div class="lh-n"><span>Прийом<b id="lhP">—</b></span><span>Поріг<b id="lhT">—</b></span><span>Запас<b id="lhM">—</b></span></div>
+      </div>
+
       <div class="tools" role="toolbar" aria-label="Керування виглядом">
         <button class="tbtn" id="tTour" type="button" aria-pressed="false"><span class="t-lg">Тур по вузлах</span><span class="t-sm">Тур</span></button>
         <button class="tbtn" id="tExplode" type="button" aria-pressed="false">Розібрати</button>
-        <button class="tbtn" id="tSignals" type="button" aria-pressed="false">Сигнали</button>
         <button class="tbtn" id="tSpin" type="button" aria-pressed="true">Обертання</button>
         <button class="tbtn" id="tReset" type="button"><span class="t-lg">Скинути вигляд</span><span class="t-sm">Скинути</span></button>
         <div class="tour" id="tourBar" hidden>
-        <button id="tourPrev" type="button" aria-label="Попередній вузол">‹</button>
-        <span id="tourPos">1 / 12</span>
-        <button id="tourNext" type="button" aria-label="Наступний вузол">›</button>
-      </div>
-      </div>
-      <div class="legend" id="legend" hidden>
-        <span><i style="--c: var(--sig-power)"></i>Живлення</span>
-        <span><i style="--c: var(--sig-ctrl)"></i>Керування · CRSF</span>
-        <span><i style="--c: var(--sig-motor)"></i>Мотори · DShot</span>
-        <span><i style="--c: var(--sig-video)"></i>Відео</span>
+          <button id="tourPrev" type="button" aria-label="Попередній вузол">‹</button>
+          <span id="tourPos">1 / 12</span>
+          <button id="tourNext" type="button" aria-label="Наступний вузол">›</button>
+        </div>
       </div>
       <div class="status" id="status" hidden></div>
       <p class="hint" id="hint"><span class="t-lg">Наведіть — підказка · клік — фокус · подвійний клік — опис · тягніть — обертати</span><span class="t-sm">Тап — фокус · двічі — опис · тягніть — обертати</span></p>
-      <div class="fallback" id="fallback" hidden>3D-сцена не запустилась: браузер не підтримує WebGL. Специфікація, описи й конфігуратор праворуч працюють.</div>
+      <div class="fallback" id="fallback" hidden>3D-сцена не запустилась: браузер не підтримує WebGL. Описи, конфігуратор, кроки сигналів і розрахунок антен праворуч працюють.</div>
     </section>
 
     <div class="rail">
       <section class="block" id="build" aria-labelledby="hBuild">
-        <div class="bhead"><h2 id="hBuild">Будова</h2><p class="eyebrow">Специфікація · маса</p></div>
+        <div class="bhead"><h2 id="hBuild">Будова</h2><p class="eyebrow" id="bomEyebrow">Специфікація · маса</p></div>
         <ol class="bom" id="bom"></ol>
       </section>
 
@@ -77,7 +84,7 @@
             <button type="button" data-mot="stop" aria-pressed="false">Стоп</button>
           </div>
           <label class="slider" for="thr"><span>Газ</span><input type="range" id="thr" min="5" max="100" step="1" value="35"><output id="thrOut" for="thr">35 %</output></label>
-          <p class="note" id="motNote">Вигляд згори, ніс від пілота. <b>Props In</b> — стандарт Betaflight: M1 і M4 за годинниковою, M2 і M3 проти.</p>
+          <p class="note" id="motNote"></p>
         </div>
 
         <div class="demo" id="dFC">
@@ -88,7 +95,7 @@
             <button type="button" data-fc="flash" aria-pressed="false" disabled>Прошити</button>
           </div>
           <div class="prog" aria-hidden="true"><i id="fcProg"></i></div>
-          <p class="note" id="fcNote">Статусний світлодіод блимає: прошивка запущена, гіроскоп опитується тисячі разів на секунду.</p>
+          <p class="note" id="fcNote"></p>
         </div>
 
         <div class="demo" id="dRX">
@@ -99,7 +106,7 @@
             <button type="button" data-rx="linked" aria-pressed="false">Збінджено</button>
             <button type="button" data-rx="wifi" aria-pressed="false">Wi-Fi</button>
           </div>
-          <p class="note" id="rxNote">Повільне блимання (0,5 с) — приймач увімкнений, але не бачить пульта.</p>
+          <p class="note" id="rxNote"></p>
         </div>
       </section>
 
@@ -111,7 +118,75 @@
         <ul class="warns" id="warns"></ul>
         <div class="slots" id="slots"></div>
       </section>
-      <p class="foot">Маса, тяга, струм і час польоту — інженерні оцінки для типових компонентів свого класу, а не паспортні дані конкретних моделей.</p>
+      <p class="foot" id="foot">Маса, тяга, струм і час польоту — інженерні оцінки для типових компонентів свого класу, а не паспортні дані конкретних моделей.</p>
+
+      <section class="block" id="sigPanel" aria-labelledby="hSig" hidden>
+        <div class="bhead"><h2 id="hSig">Сигнали</h2><p class="eyebrow">Крок за кроком</p></div>
+        <div class="seg sig-tabs" id="sigTabs" role="group" aria-label="Ланцюжок сигналу"></div>
+        <p class="sub sig-intro" id="sigIntro"></p>
+        <div class="sig-bar">
+          <button type="button" class="tbtn" id="sigPrev" aria-label="Попередній крок">‹</button>
+          <button type="button" class="tbtn" id="sigPlay" aria-pressed="true">Пауза</button>
+          <button type="button" class="tbtn" id="sigNext" aria-label="Наступний крок">›</button>
+          <span class="sig-pos" id="sigPos">1 / 1</span>
+        </div>
+        <ol class="steps" id="sigSteps"></ol>
+        <div class="sig-extra" id="sigExtra"></div>
+      </section>
+
+      <section class="block lab" id="antPanel" aria-labelledby="hAnt" hidden>
+        <div class="bhead"><h2 id="hAnt">Антени</h2><p class="eyebrow">Стенд · станція ↔ дрон</p></div>
+        <p class="sub">Оберіть антени для виносної станції й дрона, поляризацію, відстань і положення дрона. Стенд рахує бюджет радіолінії й пояснює, чому сигнал є або зникає.</p>
+        <div class="lab-row"><span class="lab-k">Канал</span><div class="seg sm" id="labCh" role="group" aria-label="Радіоканал"></div></div>
+        <div class="lab-row top"><span class="lab-k">Сценарії</span><div class="seg sm scen" id="labScen" role="group" aria-label="Готові сценарії"></div></div>
+        <p class="note scen-note" id="labScenNote" hidden></p>
+
+        <div class="lab-sides">
+          <fieldset class="lab-side">
+            <legend>Виносна станція</legend>
+            <span class="role" id="labStRole"></span>
+            <label class="vh" for="labStAnt">Антена станції</label>
+            <select id="labStAnt"></select>
+            <div class="seg sm" id="labStHand" role="group" aria-label="Поляризація антени станції"><button type="button" data-hand="1">RHCP</button><button type="button" data-hand="-1">LHCP</button></div>
+            <div class="seg sm" id="labAim" role="group" aria-label="Наведення антени станції"><button type="button" data-aim="fixed">Нерухома</button><button type="button" data-aim="track">Трекер</button></div>
+            <button type="button" class="lnk" data-focus="st">Поширення від станції</button>
+          </fieldset>
+          <fieldset class="lab-side">
+            <legend>Дрон</legend>
+            <span class="role" id="labDrRole"></span>
+            <label class="vh" for="labDrAnt">Антена дрона</label>
+            <select id="labDrAnt"></select>
+            <div class="seg sm" id="labDrHand" role="group" aria-label="Поляризація антени дрона"><button type="button" data-hand="1">RHCP</button><button type="button" data-hand="-1">LHCP</button></div>
+            <button type="button" class="lnk" data-focus="dr">Поширення від дрона</button>
+          </fieldset>
+        </div>
+
+        <div class="lab-row"><span class="lab-k">Потужність</span><div class="seg sm" id="labPw" role="group" aria-label="Потужність передавача"></div></div>
+        <div class="lab-row" id="labRateRow"><span class="lab-k">Пакети ELRS</span><div class="seg sm" id="labRate" role="group" aria-label="Частота пакетів і чутливість"></div></div>
+        <label class="slider" for="labDist"><span>Відстань</span><input type="range" id="labDist" min="0" max="1000" step="1"><output id="labDistOut" for="labDist"></output></label>
+        <label class="slider" for="labAlt"><span>Висота</span><input type="range" id="labAlt" min="0" max="600" step="5"><output id="labAltOut" for="labAlt"></output></label>
+        <div class="slider-b"><label class="slider" for="labAz"><span>Азимут</span><input type="range" id="labAz" min="-180" max="180" step="1"><output id="labAzOut" for="labAz"></output></label><button type="button" class="tbtn" id="labOrbit" aria-pressed="false">Облетіти</button></div>
+        <div class="slider-b"><label class="slider" for="labRoll"><span>Крен</span><input type="range" id="labRoll" min="-90" max="90" step="1"><output id="labRollOut" for="labRoll"></output></label><button type="button" class="tbtn" id="labRock" aria-pressed="false">Хитати</button></div>
+        <div class="lab-row top"><span class="lab-k">Показати</span><div class="seg sm" id="labShow" role="group" aria-label="Шари візуалізації"><button type="button" data-show="pat">Діаграми</button><button type="button" data-show="wave">Хвилі</button><button type="button" data-show="pol">Поляризація</button><button type="button" data-show="refl">Відбиття</button></div></div>
+        <div class="lab-row"><span class="lab-k">Хвилі від</span><div class="seg sm" id="labSrc" role="group" aria-label="Джерело хвиль"><button type="button" data-src="st">Станції</button><button type="button" data-src="dr">Дрона</button></div></div>
+
+        <div class="lab-verdict" id="labVerdict" aria-live="polite"></div>
+        <dl class="budget" id="labBudget"></dl>
+        <p class="fix" id="labFix" hidden></p>
+        <ul class="warns why" id="labWhy"></ul>
+        <details class="guide">
+          <summary>Які антени обрати</summary>
+          <ul>
+            <li><b>Відео на дрон</b> — всеспрямована кругова: Lollipop або Pagoda. Stubby — коли важить кожен грам, ціною дальності.</li>
+            <li><b>Відео на станцію</b> — патч (≈70°) для польотів у секторі; хелікал (≈30–40°) — для далеких польотів у відомому напрямку. Для польотів навколо й над собою — diversity: спрямована + всеспрямована.</li>
+            <li><b>Поляризація</b> — однакова на всіх відеоантенах системи: RHCP ↔ RHCP (або LHCP скрізь, щоб розійтися із сусідами в ефірі).</li>
+            <li><b>Керування ELRS</b> — лінійні антени: на дроні диполь або T-антена вертикально, краще дві під 90° (diversity); на станції — паралельно антені дрона. Для дальності — Moxon або Yagi з трекером.</li>
+            <li><b>Діапазон</b> — антена має бути на частоту свого каналу: роз’єм SMA підійде й до чужої антени, а резонанс — ні.</li>
+            <li><b>Правило 6 дБ</b> — кожні +6 дБ подвоюють дальність. Антена на станції зазвичай дає більше, ніж підняття потужності передавача.</li>
+          </ul>
+        </details>
+        <p class="foot">Модель — вільний простір: без рельєфу, перешкод і зони Френеля. Реальна дальність у рази менша, але співвідношення між варіантами ті самі. Підсилення антен — типові значення для свого класу.</p>
+      </section>
     </div>
   </main>
 </div>
@@ -125,11 +200,16 @@
   <div class="dr-body" id="drBody"></div>
 </aside>
 <div class="scrim" id="scrim" hidden></div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="js/data.js"></script>
-<script src="js/scene.js"></script>
-<script src="js/interaction.js"></script>
+<script src="js/content.js"></script>
+<script src="js/options.js"></script>
+<script src="js/core.js"></script>
+<script src="js/builders.js"></script>
+<script src="js/whoop.js"></script>
+<script src="js/anim.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/signals.js"></script>
+<script src="js/antlab.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>
