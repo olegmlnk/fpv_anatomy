@@ -1,6 +1,6 @@
 /* Курс по БПЛА · режим «Антени»: стенд «виносна станція ↔ дрон», бюджет радіолінії.
  * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
+ * content → options → core → builders → whoop → anim → demos → signals → antlab → relay → radio → guides → ui */
 'use strict';
 /* ================= ANTENNA LAB: виносна станція ↔ дрон ================= */
 const DEG = Math.PI / 180;
@@ -54,7 +54,7 @@ const LAB = {
   pw: { video: 600, e24: 250, e9: 250 }, rate: { e24: 250, e9: 100 },
   aim: 'fixed', dist: 2, alt: 80, az: 0, roll: 0,
   show: { pat: true, wave: true, pol: true, refl: false }, src: 'tx',
-  orbit: false, rock: false, rockT: 0, t: 0, scen: 'ok', res: null, dirty: true
+  orbit: false, rock: false, rockT: 0, t: 0, scen: 'ok', res: null, dirty: true, sub: 'lab'
 };
 const SCEN = [
   { id: 'ok', name: 'Правильний комплект', ch: 'video', st: 'patch58', dr: 'lolli58', dist: 2, alt: 80, note: 'Обидві антени RHCP, патч дивиться на дрон. Лишаються тільки втрати на відстані — це еталон для порівняння.' },
@@ -400,21 +400,24 @@ function labInit() {
     ringSets.push(set);
   }
   glyph.tx = makeGlyph(); glyph.rx = makeGlyph();
+  relInit();
 }
 function labEnter() {
   if (!labG) return;
+  if (LAB.sub === 'relay') { relEnter(); return; }
   labG.visible = true; ctl.auto = false; updateSpinBtn();
   labSetAnts(); LAB.res = labSolve(); labApply(LAB.res); labReadout(LAB.res);
   labFrame(LAB.orbit ? 'orbit' : 'link');
 }
 function labExit() {
   if (labG) labG.visible = false;
+  relExit();
   if (LAB.orbit || LAB.rock) { LAB.orbit = false; LAB.rock = false; labRenderControls(); }
   for (const [k, e] of LB) if (k.startsWith('lab')) e.on = false;
 }
 function labTheme() {
   if (!labG) return;
-  drawLabGround();
+  drawLabGround(); relTheme();
   [stAntG, drAntG].forEach(G => { const w = G.userData.pat && G.userData.pat.userData.wire; if (w) w.material.color.copy(C(TC['--ink'])); });
   LAB.dirty = true;
 }
@@ -493,6 +496,7 @@ function labAnimate(r, now) {
 }
 function tickLab(dt, now) {
   if (!labG) return;
+  if (LAB.sub === 'relay') { tickRel(dt, now); return; }
   LAB.t += reduceMotion ? 0 : dt;
   if (LAB.orbit) { LAB.az = wrap180(LAB.az + dt * 16); LAB.dirty = true; }
   if (LAB.rock) { LAB.rockT += dt; LAB.roll = Math.round(85 * Math.sin(LAB.rockT * 0.8)); LAB.dirty = true; }
@@ -504,6 +508,7 @@ function tickLab(dt, now) {
 }
 function labFrame(kind) {
   if (!ok3d || !labG) return;
+  if (LAB.sub === 'relay') { relFrame(); return; }
   const r = LAB.res || labSolve(), A = v3(r.head), B = v3(r.dPos);
   if (kind === 'orbit') { setView(new T.Vector3(0, 6, 0), null, 0.95, fitDist(r.R + 7)); return; }
   if (kind === 'st' || kind === 'dr') {
@@ -609,6 +614,7 @@ function labFocus(side) {
 }
 /* відкрити стенд з антеною, що стоїть на дроні в конфігураторі */
 function labOpenFrom(kind) {
+  if (LAB.sub !== 'lab') relSetSub('lab');
   if (kind === 'vtx') { LAB.ch = 'video'; LAB.sel.video.dr = opt('vtxant').lab || 'lolli58'; }
   else {
     const a = opt('rx').ant;
@@ -646,4 +652,5 @@ function labUIInit() {
   $('labAz').addEventListener('input', e => { LAB.az = +e.target.value; LAB.orbit = false; labChanged(true); });
   $('labRoll').addEventListener('input', e => { LAB.roll = +e.target.value; LAB.rock = false; labChanged(true); });
   labRenderControls(); LAB.res = labSolve(); labReadout(LAB.res);
+  relUIInit();
 }

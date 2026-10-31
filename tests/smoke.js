@@ -1,5 +1,6 @@
-/* Smoke-тест: відкриває сторінку на десктопній і мобільній ширині, проходить усі платформи й режими
- * (3D-будова, Сигнали, Антени), анімації, варіанти конфігуратора, сценарії антенного стенду й бічну панель.
+/* Smoke-тест: відкриває сторінку на десктопній і мобільній ширині, проходить усі платформи й розділи
+ * (3D-будова, Сигнали, Антени з ретранслятором, Пульт, Гайди), анімації, варіанти конфігуратора, сценарії
+ * антенного стенду, ретранслятора й пульта, усі кроки гайдів і бічну панель.
  * Перевіряє помилки консолі та горизонтальне прокручування.
  * Запуск: npm install && npx playwright install chromium && npm test */
 const { chromium } = require('playwright');
@@ -25,6 +26,9 @@ const DEMO_STEPS = [
 ];
 const CHAINS = ['ctrl', 'power', 'video', 'tele'];
 const SCENARIOS = ['ok', 'lhcp', 'mix', 'roll', 'beam', 'over', 'band', 'far'];
+const RELAY = ['none', 'top', 'analog', 'same', 'e9', 'low'];
+const RADIO = ['trim', 'map', 'rev', 'arm3', 'early', 'fs', 'ok'];
+const SWITCHES = ['SA', 'SB', 'SC', 'SD', 'SE', 'SF', 'SG'];
 const VIEWPORTS = [
   { name: 'desktop', full: true, viewport: { width: 1440, height: 900 } },
   { name: 'mobile', full: false, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
@@ -74,6 +78,38 @@ const VIEWPORTS = [
     const verdict = await page.$eval('#labVerdict b', el => el.textContent);
     await page.screenshot({ path: path.join(shotsDir, `${name}-antennas.png`) });
 
+    /* ретранслятор */
+    await click('#antSub [data-asub="relay"]'); await page.waitForTimeout(400);
+    for (const s of RELAY) { await click(`#relScen [data-rscn="${s}"]`); await page.waitForTimeout(200); }
+    await click('#relView [data-rview2="build"]'); await page.waitForTimeout(600);
+    await click('#relView [data-rview2="link"]'); await page.waitForTimeout(200);
+    await overflow();
+    const relay = await page.$eval('#relVerdict b', el => el.textContent);
+    await page.screenshot({ path: path.join(shotsDir, `${name}-relay.png`) });
+    await click('#antSub [data-asub="lab"]'); await page.waitForTimeout(200);
+
+    /* пульт: тумблери, сценарії, армування */
+    await mode('radio'); await page.waitForTimeout(500);
+    for (const sw of SWITCHES) { await click(`#radSw [data-rsw="${sw}"]`); await page.waitForTimeout(60); }
+    for (const s of RADIO) { await click(`#radScen [data-rscen="${s}"]`); await page.waitForTimeout(200); }
+    await click('#radSw [data-rsw="SF"]');
+    await page.waitForFunction(() => FCS.armed, null, { timeout: 8000 }).catch(() => {});
+    const armed = await page.evaluate(() => FCS.armed);
+    for (const v of ['radio', 'drone', 'pilot']) if (webgl) { await click(`[data-rview="${v}"]`); await page.waitForTimeout(200); }
+    await overflow();
+    await page.screenshot({ path: path.join(shotsDir, `${name}-radio.png`) });
+
+    /* гайди: усі кроки всіх трьох */
+    await mode('guides'); await page.waitForTimeout(400);
+    let steps = 0;
+    for (const g of ['bf', 'tx', 'elrs']) {
+      await click(`#gdTabs [data-gd="${g}"]`);
+      const n = await page.$$eval('#gdSteps > li', l => l.length); steps += n;
+      for (let i = 1; i < n; i++) { await click('#gdNext'); await page.waitForTimeout(40); }
+    }
+    await overflow();
+    await page.screenshot({ path: path.join(shotsDir, `${name}-guides.png`) });
+
     await mode('build');
     await click('#bom [data-open="cam"]');
     await page.waitForTimeout(800);
@@ -82,8 +118,8 @@ const VIEWPORTS = [
     await overflow();
     await page.screenshot({ path: path.join(shotsDir, `${name}.png`) });
 
-    const ok = errors.length === 0 && drawerOpen && videoPath === 2 && maxOverflow <= 0 && !!verdict;
-    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: webgl=${webgl} swaps=${swaps} drawer=${drawerOpen} videoPath=${videoPath} lab="${verdict}" overflow=${maxOverflow}px errors=${errors.length}`);
+    const ok = errors.length === 0 && drawerOpen && videoPath === 2 && maxOverflow <= 0 && !!verdict && !!relay && armed && steps === 34;
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: webgl=${webgl} swaps=${swaps} drawer=${drawerOpen} videoPath=${videoPath} lab="${verdict}" relay="${relay}" armed=${armed} guideSteps=${steps} overflow=${maxOverflow}px errors=${errors.length}`);
     errors.forEach(e => console.log('  ' + e));
     if (!ok) failed = true;
     await ctx.close();

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Курс по БПЛА</title>
-<meta name="description" content="Інтерактивний курс з будови FPV-дронів: 3D-моделі 5″, 7″, 10″, гексакоптера й tiny whoop, покрокові ланцюжки сигналів і антенний стенд з розрахунком радіолінії.">
+<meta name="description" content="Інтерактивний курс з будови FPV-дронів і радіозв’язку: 3D-моделі 5″, 7″, 10″, гексакоптера й tiny whoop, ланцюжки сигналів, антенний стенд і ретранслятор, 3D-пульт TX16S із симулятором і покрокові гайди з Betaflight, EdgeTX і ExpressLRS.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7 7L25 25M25 7L7 25' stroke='%23232826' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='7' cy='7' r='5' fill='%23E8A200'/%3E%3Ccircle cx='25' cy='7' r='5' fill='%23E8A200'/%3E%3Ccircle cx='7' cy='25' r='5' fill='%23E8A200'/%3E%3Ccircle cx='25' cy='25' r='5' fill='%23E8A200'/%3E%3Crect x='12' y='11' width='8' height='10' rx='2' fill='%23232826'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +16,7 @@
   <main class="layout">
   <header class="top">
     <div>
-      <p class="eyebrow">FPV-дрони · будова · сигнали · антени</p>
+      <p class="eyebrow">FPV-дрони · будова · сигнали · антени · пульт</p>
       <h1>Курс по <span>БПЛА</span></h1>
     </div>
     <p class="lede" id="lede"></p>
@@ -24,6 +24,8 @@
       <button type="button" data-mode="build" aria-pressed="true">3D-будова</button>
       <button type="button" data-mode="signals" aria-pressed="false">Сигнали</button>
       <button type="button" data-mode="antennas" aria-pressed="false">Антени</button>
+      <button type="button" data-mode="radio" aria-pressed="false">Пульт</button>
+      <button type="button" data-mode="guides" aria-pressed="false">Гайди</button>
     </nav>
     <div class="plats" id="platRow">
       <span class="lab-k">Платформа</span>
@@ -50,7 +52,19 @@
         <div class="lh-n"><span>Прийом<b id="lhP">—</b></span><span>Поріг<b id="lhT">—</b></span><span>Запас<b id="lhM">—</b></span></div>
       </div>
 
+      <div class="rad-hud" id="radHud" hidden aria-live="polite">
+        <div class="rh-top"><b id="rhS">—</b><span id="rhM"></span></div>
+        <div class="rh-n"><span>Газ<b id="rhT">—</b></span><span>Висота<b id="rhA">—</b></span><span>LQ<b id="rhL">—</b></span><span>FM<b id="rhF">—</b></span></div>
+      </div>
+
+      <div class="gd-hud" id="gdHud" hidden aria-live="polite">
+        <span class="gh-t" id="ghT"></span><b id="ghS"></b><span class="gh-c" id="ghC"></span>
+      </div>
+
       <div class="tools" role="toolbar" aria-label="Керування виглядом">
+        <button class="tbtn" type="button" data-rview="pilot" aria-pressed="true" hidden>Пілот</button>
+        <button class="tbtn" type="button" data-rview="radio" aria-pressed="false" hidden><span class="t-lg">Пульт крупно</span><span class="t-sm">Пульт</span></button>
+        <button class="tbtn" type="button" data-rview="drone" aria-pressed="false" hidden><span class="t-lg">За дроном</span><span class="t-sm">Дрон</span></button>
         <button class="tbtn" id="tTour" type="button" aria-pressed="false"><span class="t-lg">Тур по вузлах</span><span class="t-sm">Тур</span></button>
         <button class="tbtn" id="tExplode" type="button" aria-pressed="false">Розібрати</button>
         <button class="tbtn" id="tSpin" type="button" aria-pressed="true">Обертання</button>
@@ -135,7 +149,9 @@
       </section>
 
       <section class="block lab" id="antPanel" aria-labelledby="hAnt" hidden>
-        <div class="bhead"><h2 id="hAnt">Антени</h2><p class="eyebrow">Стенд · станція ↔ дрон</p></div>
+        <div class="bhead"><h2 id="hAnt">Антени</h2><p class="eyebrow" id="antEyebrow">Стенд · станція ↔ дрон</p></div>
+        <div class="seg ant-sub" id="antSub" role="group" aria-label="Підрозділ"><button type="button" data-asub="lab" aria-pressed="true">Антенний стенд</button><button type="button" data-asub="relay" aria-pressed="false">Ретранслятор</button></div>
+        <div id="labBody">
         <p class="sub">Оберіть антени для виносної станції й дрона, поляризацію, відстань і положення дрона. Стенд рахує бюджет радіолінії й пояснює, чому сигнал є або зникає.</p>
         <div class="lab-row"><span class="lab-k">Канал</span><div class="seg sm" id="labCh" role="group" aria-label="Радіоканал"></div></div>
         <div class="lab-row top"><span class="lab-k">Сценарії</span><div class="seg sm scen" id="labScen" role="group" aria-label="Готові сценарії"></div></div>
@@ -186,6 +202,134 @@
           </ul>
         </details>
         <p class="foot">Модель — вільний простір: без рельєфу, перешкод і зони Френеля. Реальна дальність у рази менша, але співвідношення між варіантами ті самі. Підсилення антен — типові значення для свого класу.</p>
+        </div>
+
+        <div class="rel" id="relBody" hidden>
+          <p class="sub">Станція за кілька кілометрів від дрона, а між ними — пагорб. Порівняйте зв’язок напряму й через ретранслятор на вершині, подивіться, з чого він складається і чому приймати й передавати треба на різних частотах.</p>
+          <div class="lab-row"><span class="lab-k">Канал</span><div class="seg sm" id="relCh" role="group" aria-label="Радіоканал"></div></div>
+          <div class="lab-row top"><span class="lab-k">Сценарії</span><div class="seg sm scen" id="relScen" role="group" aria-label="Готові сценарії"></div></div>
+          <p class="note scen-note" id="relScenNote" hidden></p>
+          <div class="lab-row"><span class="lab-k">Ретранслятор</span><div class="seg sm" id="relOn" role="group" aria-label="Ретранслятор"><button type="button" data-ron="1">Увімкнено</button><button type="button" data-ron="0">Вимкнено</button></div></div>
+          <div class="lab-row"><span class="lab-k">Тип</span><div class="seg sm" id="relKind" role="group" aria-label="Тип ретранслятора"><button type="button" data-rkind="digital">Цифровий</button><button type="button" data-rkind="analog">Аналоговий</button></div></div>
+          <div class="lab-row"><span class="lab-k">Частоти</span><div class="seg sm" id="relFreq" role="group" aria-label="Частоти прийому й передачі"><button type="button" data-rfreq="diff">Прийом f1, передача f2</button><button type="button" data-rfreq="same">Той самий канал</button></div></div>
+          <div class="lab-row"><span class="lab-k">Потужність</span><div class="seg sm" id="relPw" role="group" aria-label="Потужність передавачів"></div></div>
+          <label class="slider" for="relD1"><span>До пагорба</span><input type="range" id="relD1" min="3" max="50" step="1"><output id="relD1Out" for="relD1"></output></label>
+          <label class="slider" for="relD2"><span>За пагорбом</span><input type="range" id="relD2" min="3" max="50" step="1"><output id="relD2Out" for="relD2"></output></label>
+          <label class="slider" for="relHill"><span>Пагорб</span><input type="range" id="relHill" min="0" max="300" step="5"><output id="relHillOut" for="relHill"></output></label>
+          <label class="slider" for="relAlt"><span>Висота дрона</span><input type="range" id="relAlt" min="5" max="300" step="5"><output id="relAltOut" for="relAlt"></output></label>
+          <div class="lab-row"><span class="lab-k">Показати</span><div class="seg sm" id="relView" role="group" aria-label="Вигляд"><button type="button" data-rview2="link">Зв’язок</button><button type="button" data-rview2="build">Будова ретранслятора</button></div></div>
+          <div class="lab-row"><span class="lab-k">Шари</span><div class="seg sm"><button type="button" id="relFres" aria-pressed="true">Зона Френеля</button></div></div>
+          <div class="lab-verdict" id="relVerdict" aria-live="polite"></div>
+          <dl class="budget" id="relBudget"></dl>
+          <ul class="warns why" id="relWhy"></ul>
+          <details class="guide" open>
+            <summary>Як працює ретранслятор</summary>
+            <ul>
+              <li><b>Радіотінь.</b> Хвилі гігагерцового діапазону поширюються майже по прямій. Пагорб, будівля чи ліс між станцією й дроном створюють радіотінь: сигнал туди потрапляє лише огинаючи перешкоду (дифракція) й відбиваючись, втрачаючи десятки децибел.</li>
+              <li><b>Два відкриті прольоти замість одного закритого.</b> Ретранслятор ставлять туди, звідки видно обидва кінці лінії: на вершину, дах, щоглу або на інший літальний апарат. Він приймає сигнал і передає його далі.</li>
+              <li><b>Різні частоти.</b> Щоб не заглушити самого себе, ретранслятор приймає на одній частоті (f1), а передає на іншій (f2) і розділяє їх фільтрами. Інший спосіб — почергова робота в часі (TDD): прийняв пакет, потім передав.</li>
+              <li><b>Цифровий чи аналоговий.</b> Цифровий декодує пакети й генерує їх заново: шум не накопичується, але додається затримка. Аналоговий підсилює сигнал разом із шумом: затримки майже немає, але якість гірша за слабший проліт.</li>
+              <li><b>Ланцюг тримається на слабшій ланці.</b> Кожен проліт має свій бюджет: відстань, антени, втрати. Для двостороннього каналу (керування й телеметрія) — ще й для кожного напрямку.</li>
+              <li>Ту саму ідею використовують радіоаматорські репітери на вершинах, стільникові ретранслятори та рятувальні служби в горах.</li>
+            </ul>
+          </details>
+          <details class="guide">
+            <summary>Будова: що всередині</summary>
+            <ul>
+              <li><b>Антена прийому</b> дивиться на станцію; часто спрямована (патч, Yagi), щоб мати більше підсилення.</li>
+              <li><b>Фільтри f1 і f2</b> пропускають лише свою частоту; разом вони утворюють дуплексер і не дають передавачу «засліпити» приймач.</li>
+              <li><b>Приймач</b> виділяє сигнал f1 і демодулює його.</li>
+              <li><b>Обробка:</b> у цифровому ретрансляторі мікроконтролер декодує й перевіряє пакети та передає їх далі; в аналоговому — підсилювач і модулятор.</li>
+              <li><b>Передавач</b> формує сигнал f2 і підсилює його; гріється, тому має радіатор.</li>
+              <li><b>Антена передачі</b> дивиться на дрон, або всеспрямована, якщо дрон літає навколо.</li>
+              <li><b>Живлення</b> — батарея з перетворювачем напруги; час роботи визначають ємність і потужність передавача.</li>
+              <li>Антени рознесені й розвернуті в різні боки — це додаткова розв’язка між прийомом і передачею.</li>
+            </ul>
+          </details>
+          <details class="guide">
+            <summary>Де ставити й що врахувати</summary>
+            <ul>
+              <li><b>Висота важливіша за потужність.</b> Ретранслятор має бачити обидва кінці з вільною першою зоною Френеля: на 2,4 ГГц на прольоті 2 км її радіус посередині ≈8 м.</li>
+              <li><b>Бюджет — для кожного прольоту</b> й кожного напрямку: керування до дрона, телеметрія чи відео від нього.</li>
+              <li><b>Затримка.</b> Кожен цифровий проліт додає мілісекунди — на швидких маневрах це відчутно.</li>
+              <li><b>Надійність.</b> Ретранслятор — ще одна точка відмови: живлення, кріплення, погода. Failsafe дрона має бути налаштований.</li>
+              <li><b>Правила.</b> Частоти й потужність — лише в межах дозволеного; вимоги до ретрансляторів залежать від країни.</li>
+            </ul>
+          </details>
+          <p class="foot">Модель спрощена: рельєф — одна вершина (дифракція на «ножовій» перешкоді за ITU-R P.526), без відбиттів, рослинності й кривизни Землі. Сцену стиснуто по горизонталі й розтягнуто по вертикалі; розрахунок — у справжніх метрах.</p>
+        </div>
+      </section>
+
+      <section class="block rad" id="radPanel" aria-labelledby="hRad" hidden>
+        <div class="bhead"><h2 id="hRad">Пульт TX16S</h2><p class="eyebrow">EdgeTX · ExpressLRS · Betaflight</p></div>
+        <p class="sub">Тумблери, стіки, потенціометри й слайдери стоять там, де на справжньому пульті. Шлях команди: орган керування → канал EdgeTX → ExpressLRS → польотник → режим Betaflight → дрон. Призначайте канали й режими — дрон реагує на те, що дійшло до польотника.</p>
+        <div class="rad-stat" id="radStat" aria-live="polite"></div>
+        <div class="pads">
+          <div class="pad-w"><div class="pad" data-pad="L" aria-label="Лівий стік: газ і рискання"><i></i></div><span class="pad-k">Лівий · газ ↕ · рискання ↔</span><span class="pad-v" id="padLv"></span></div>
+          <div class="pad-w"><div class="pad" data-pad="R" aria-label="Правий стік: тангаж і крен"><i></i></div><span class="pad-k">Правий · тангаж ↕ · крен ↔</span><span class="pad-v" id="padRv"></span></div>
+        </div>
+        <div class="rad-sw" id="radSw" role="group" aria-label="Тумблери SA–SH"></div>
+        <div class="rad-an" id="radAn"></div>
+        <div class="rad-act">
+          <button type="button" class="tbtn" id="radLinkBtn" data-ract="link" aria-pressed="false">Обірвати зв’язок</button>
+          <button type="button" class="tbtn" id="radPwrBtn" data-ract="power" aria-pressed="false">Вимкнути пульт</button>
+          <button type="button" class="tbtn" data-ract="flip">Перекинути дрон</button>
+          <button type="button" class="tbtn" data-ract="reset">Скинути дрон</button>
+          <button type="button" class="tbtn" id="radSndBtn" data-ract="sound" aria-pressed="false">Звук біпера</button>
+        </div>
+        <p class="note rad-keys">Клавіатура: W / S — газ, A / D — рискання, стрілки — тангаж і крен, пробіл — SF, 1 / 2 / 3 — SB, E — SE, H — SH (утримуйте).</p>
+
+        <h3 class="rad-h">Канали: пульт → польотник</h3>
+        <p class="sub">CH1–CH4 — стіки (порядок AETR), CH5–CH12 — допоміжні канали AUX1–AUX8: оберіть, який орган керування на якому каналі. Смужка — значення від 988 до 2012 мкс.</p>
+        <div class="mix" id="radMix"></div>
+        <div class="lab-row"><span class="lab-k">Карта каналів</span><div class="seg sm" id="radMap" role="group" aria-label="Порядок каналів у Betaflight"><button type="button" data-rmap="AETR">AETR1234</button><button type="button" data-rmap="TAER">TAER1234</button></div></div>
+        <p class="note">Трими: <span id="radTrims"></span> <button type="button" class="lnk" data-ract="trim0">Обнулити</button></p>
+
+        <h3 class="rad-h">Режими Betaflight</h3>
+        <p class="sub">Режим вмикається, коли значення його AUX-каналу потрапляє в діапазон. Риска — поточне значення каналу.</p>
+        <div class="mdt" id="radModes"></div>
+        <div class="lab-row"><span class="lab-k">Failsafe</span><div class="seg sm" id="radFs" role="group" aria-label="Процедура failsafe, стадія 2"><button type="button" data-rfs="drop">Drop</button><button type="button" data-rfs="land">Land</button></div></div>
+
+        <div class="lab-row top"><span class="lab-k">Типові помилки</span><div class="seg sm scen" id="radScen" role="group" aria-label="Сценарії налаштування"></div></div>
+        <p class="note scen-note" id="radScenNote" hidden></p>
+
+        <details class="guide">
+          <summary>Як команда доходить до моторів</summary>
+          <ul>
+            <li><b>Пульт (EdgeTX).</b> Стіки, тумблери й потенціометри — джерела. Мікшер кладе їх у канали CH1–CH16; 100 % = 512 одиниць, тож канал ходить від 988 до 2012 мкс, центр — 1500.</li>
+            <li><b>Радіолінія (ExpressLRS).</b> Внутрішній модуль передає канали пакетами. CH1–CH4 — з повною роздільністю, AUX1 (CH5) у стандартних режимах перемикачів — одним бітом у кожному пакеті: тому на CH5 ставлять ARM, і лише на 2-позиційний тумблер.</li>
+            <li><b>Приймач → польотник.</b> Приймач віддає канали польотнику по UART протоколом CRSF. Betaflight розкладає їх за картою каналів (AETR1234) на Roll, Pitch, Throttle, Yaw і AUX1…</li>
+            <li><b>Режими.</b> У вкладці Modes кожен режим прив’язаний до AUX-каналу й діапазону. Значення в діапазоні — режим увімкнено.</li>
+            <li><b>Стабілізація.</b> У режимі ANGLE стік задає кут нахилу, в Acro — швидкість обертання. PID-регулятор порівнює задане з гіроскопом і через ESC змінює оберти моторів.</li>
+          </ul>
+        </details>
+        <details class="guide">
+          <summary>Чому дрон не армиться</summary>
+          <ul>
+            <li><b>THROTTLE</b> — газ вище min_check (≈1050 мкс): опустіть стік, обнуліть тример газу, перевірте карту каналів.</li>
+            <li><b>ANGLE</b> — дрон нахилений більше ніж на 25°: поставте рівно. Перевернутий армиться лише з увімкненим turtle.</li>
+            <li><b>RXLOSS / FAILSAFE</b> — польотник не бачить приймач: перевірте біндинг, порт UART і протокол у вкладці Receiver.</li>
+            <li><b>ARMSWITCH / BADRX</b> — ARM уже був увімкнений, коли армування заборонили або коли з’явився зв’язок: вимкніть і знову увімкніть ARM.</li>
+            <li>Причину Betaflight показує в Configurator (вкладка Setup, Arming Disable Flags) і в OSD; на пульті телеметрія FM показує <code>!ERR</code>.</li>
+          </ul>
+        </details>
+        <p class="foot">Симулятор спрощений: ідеальний регулятор, оцінна тяга, без вітру. Розміри дрона й арени умовні. Назви режимів, прапорців і параметрів — як у Betaflight та EdgeTX; конкретні значення за замовчуванням залежать від версії прошивки.</p>
+      </section>
+
+      <section class="block gd" id="gdPanel" aria-labelledby="hGd" hidden>
+        <div class="bhead"><h2 id="hGd">Гайди</h2><p class="eyebrow">Покроково · без прив’язки до плати</p></div>
+        <div class="seg gd-tabs" id="gdTabs" role="group" aria-label="Гайд"></div>
+        <h3 class="rad-h" id="gdTitle"></h3>
+        <p class="sub" id="gdIntro"></p>
+        <div class="gd-bar">
+          <button type="button" class="tbtn" id="gdPrev" aria-label="Попередній крок">‹</button>
+          <button type="button" class="tbtn" id="gdNext" aria-label="Наступний крок">›</button>
+          <span class="sig-pos" id="gdPos">1 / 1</span>
+          <span class="gd-prog" aria-hidden="true"><i id="gdBar"></i></span>
+          <span class="gd-done" id="gdDone"></span>
+        </div>
+        <ol class="gsteps" id="gdSteps"></ol>
+        <p class="foot">Гайди описують загальновідомий порядок налаштування; назви пунктів меню можуть відрізнятися між версіями Betaflight, EdgeTX і ExpressLRS. Позначки «готово» зберігаються лише в цьому браузері. Літайте там, де це дозволено, і в межах дозволених частот і потужностей.</p>
       </section>
     </div>
   </main>
@@ -210,6 +354,9 @@
 <script src="js/demos.js"></script>
 <script src="js/signals.js"></script>
 <script src="js/antlab.js"></script>
+<script src="js/relay.js"></script>
+<script src="js/radio.js"></script>
+<script src="js/guides.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

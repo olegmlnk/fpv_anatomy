@@ -1,8 +1,8 @@
 {
   "name": "fpv-anatomy",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
-  "description": "Курс по БПЛА: інтерактивна 3D-будова FPV-дронів (5″, 7″, 10″, гекса, whoop), покрокові сигнали й антенний стенд на Three.js",
+  "description": "Курс по БПЛА: 3D-будова FPV-дрона, сигнали, антени й ретранслятор, 3D-пульт TX16S із симулятором і гайди з Betaflight, EdgeTX, ExpressLRS — на Three.js",
   "scripts": {
     "start": "npx --yes serve@14 .",
     "test": "node tests/smoke.js"

@@ -232,10 +232,12 @@ function setMode(m) {
   if (S.explodeOn) { S.explodeOn = false; document.getElementById('tExplode').setAttribute('aria-pressed', 'false'); }
   S.sel = null; S.ghost = false; S.hover = null;
   if (ok3d) {
-    const lab = m === 'antennas';
-    root.visible = !lab; matMesh.visible = !lab; shadowMesh.visible = !lab; wbLine.visible = !lab;
+    const lab = m === 'antennas', rad = m === 'radio', away = lab || rad || m === 'guides';
+    root.visible = !away; matMesh.visible = !away; shadowMesh.visible = !away; wbLine.visible = !away;
     if (m === 'signals') sigEnter(); else sigExit();
     if (lab) labEnter(); else labExit();
+    if (rad) radEnter(); else radExit();
+    if (m === 'guides') guideEnter(); else guideExit();
     if (m === 'build') { homeView(); ctl.auto = !reduceMotion; updateSpinBtn(); }
     applyLook();
   }
@@ -304,7 +306,7 @@ function initScene() {
   for (let i = 0; i < 6; i++) arrows.push(makeArrow());
   brkHover = makeBrackets(0.55); brkSel = makeBrackets(1);
   makeUSB(); makeRadio();
-  sigInit(); labInit();
+  sigInit(); labInit(); radInit();
   ctl = { target: new T.Vector3(0, 2.4, 0.3), tTarget: new T.Vector3(0, 2.4, 0.3), yaw: 2.45, tYaw: 2.45, pitch: 0.44, tPitch: 0.44, dist: 46, tDist: 46, auto: !reduceMotion, drag: false };
   raycaster = new T.Raycaster(); ndc = new T.Vector2();
   rebuild(ORDER.slice(), true);
@@ -317,7 +319,7 @@ function initScene() {
     readTheme(); drawMat(); updatePropHands();
     wbLine.material.color.copy(C(TC['--ink']));
     [brkHover, brkSel].forEach(b => b.material.color.copy(C(TC['--accent'])));
-    sigTheme(); labTheme();
+    sigTheme(); labTheme(); radTheme();
     applyLook();
   };
   if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
@@ -351,6 +353,8 @@ function loop(nowMs) {
   tickMotors(dt); tickFC(dt, now); tickRX(dt, now); tickTour(dt); tickFlash(dt);
   if (S.mode === 'signals') tickSig(dt, now);
   if (S.mode === 'antennas') tickLab(dt, now);
+  if (S.mode === 'radio') tickRad(dt, now);
+  if (S.mode === 'guides') tickGuide(dt, now);
 
   const showNums = S.ex > 0.5 && S.mode === 'build';
   for (const id of ORDER) {
@@ -361,7 +365,7 @@ function loop(nowMs) {
   const wbl = LB.get('wb'); if (wbl) wbl.on = !S.demo && S.ex < 0.5 && S.mode === 'build' && !narrowMQ.matches;
 
   if (S.hover && S.hover !== S.sel && S.mode === 'build') { brkHover.visible = true; setBrackets(brkHover, compBox(S.hover).expandByScalar(0.15 * kScale())); } else brkHover.visible = false;
-  if (S.sel && !S.demo && S.mode === 'build') { brkSel.visible = true; setBrackets(brkSel, compBox(S.sel).expandByScalar(0.18 * kScale())); brkSel.material.opacity = 0.7 + 0.3 * Math.sin(now * 3); } else brkSel.visible = false;
+  if (S.sel && !S.demo && (S.mode === 'build' || S.mode === 'guides') && root.visible) { brkSel.visible = true; setBrackets(brkSel, compBox(S.sel).expandByScalar(0.18 * kScale())); brkSel.material.opacity = 0.7 + 0.3 * Math.sin(now * 3); } else brkSel.visible = false;
 
   renderer.render(scene, camera);
   updateLabels(); updateLeader();
@@ -370,14 +374,17 @@ function loop(nowMs) {
 /* ---------- pointer ---------- */
 function bindPointer() {
   const ptrs = new Map(); let down = null, pinch = 0, lastTap = { id: null, t: 0 };
-  const hoverAt = (x, y) => setHover(S.mode === 'build' ? pick(x, y) : null);
+  const hoverAt = (x, y) => { if (radPtrOn()) { radHover(x, y); return; } setHover(S.mode === 'build' ? pick(x, y) : null); };
   canvas.addEventListener('pointerdown', e => {
     canvas.setPointerCapture(e.pointerId);
+    /* у розділі «Пульт» вказівник на органі керування рухає його, а не камеру */
+    if (radPtrOn() && radDown(e)) return;
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     down = { x: e.clientX, y: e.clientY, moved: false, type: e.pointerType };
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); }
   });
   canvas.addEventListener('pointermove', e => {
+    if (radOwns(e.pointerId)) { radMove(e); return; }
     const p = ptrs.get(e.pointerId);
     if (!p) { if (e.pointerType === 'mouse') hoverAt(e.clientX, e.clientY); return; }
     const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
@@ -398,6 +405,7 @@ function bindPointer() {
     }
   });
   const end = e => {
+    if (radOwns(e.pointerId)) { radUp(e); return; }
     const had = ptrs.has(e.pointerId); ptrs.delete(e.pointerId);
     if (ptrs.size < 2) pinch = 0;
     if (!had) return;
@@ -413,9 +421,19 @@ function bindPointer() {
   };
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
-  canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && !ptrs.size) setHover(null); });
-  canvas.addEventListener('dblclick', e => { if (S.mode !== 'build') return; const id = pick(e.clientX, e.clientY); if (id) openDrawer(id); });
-  canvas.addEventListener('wheel', e => { e.preventDefault(); ctl.tDist = Math.min(400, Math.max(1.5, ctl.tDist * Math.exp(e.deltaY * 0.0011))); }, { passive: false });
+  canvas.addEventListener('pointerleave', e => {
+    if (e.pointerType !== 'mouse' || ptrs.size) return;
+    if (radPtrOn()) { RAD.hover = null; canvas.classList.remove('hovering'); } else setHover(null);
+  });
+  canvas.addEventListener('dblclick', e => {
+    if (radPtrOn()) { radDblClick(e); return; }
+    if (S.mode !== 'build') return; const id = pick(e.clientX, e.clientY); if (id) openDrawer(id);
+  });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (radPtrOn() && radWheel(e)) return;
+    ctl.tDist = Math.min(400, Math.max(1.5, ctl.tDist * Math.exp(e.deltaY * 0.0011)));
+  }, { passive: false });
 }
 function pick(cx, cy) {
   const r = canvas.getBoundingClientRect();

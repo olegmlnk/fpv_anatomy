@@ -1,6 +1,6 @@
 /* Курс по БПЛА · перемикачі режимів і платформ, специфікація, конфігуратор, бічна панель, події.
  * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
+ * content → options → core → builders → whoop → anim → demos → signals → antlab → radio → guides → ui */
 'use strict';
 /* ================= UI: MODES, PLATFORMS, BOM, DEMOS, CONFIGURATOR, DRAWER ================= */
 const $ = id => document.getElementById(id);
@@ -14,17 +14,24 @@ const setHTML = (el, h) => { if (el && el.dataset.h !== h) { el.innerHTML = h; e
 const LEDE = {
   build: 'Наведіть або торкніться деталі — з’явиться підказка; подвійний клік відкриває повний опис з видами компонента. Праворуч — специфікація, анімації та конфігуратор: міняйте вузли й дивіться, як змінюються маса, тяга й час польоту.',
   signals: 'Оберіть ланцюжок — і сигнал пройде дроном крок за кроком: звідки, куди й яким протоколом. Схема перебудовується під вибрані компоненти й платформу.',
-  antennas: 'Стенд «виносна станція ↔ дрон»: оберіть антени, поляризацію, відстань і положення дрона — і подивіться, чому зв’язок є або зникає.'
+  antennas: 'Стенд «виносна станція ↔ дрон»: оберіть антени, поляризацію, відстань і положення дрона — і подивіться, чому зв’язок є або зникає.',
+  radio: 'Пульт TX16S: рухайте стіки, клацайте тумблери, крутіть потенціометри. Призначайте канали й режими Betaflight — дрон на арені реагує на те, що дійшло до польотника.',
+  guides: 'Покрокові гайди: польотник на Betaflight, пульт на EdgeTX і радіолінія ExpressLRS. Загальний порядок без прив’язки до конкретної плати; 3D-сцена показує, про що йдеться на кроці.'
 };
 const HINT = {
   build: ['Наведіть — підказка · клік — фокус · подвійний клік — опис · тягніть — обертати', 'Тап — фокус · двічі — опис · тягніть — обертати'],
   signals: ['Тягніть — обертати · колесо або щипок — масштаб · кроки ланцюжка — праворуч', 'Тягніть — обертати · кроки ланцюжка — нижче'],
-  antennas: ['Оболонка — діаграма спрямованості · кільця — хвилі · стрілки — вектор поля E', 'Оболонка — діаграма · кільця — хвилі · стрілки — поле E']
+  antennas: ['Оболонка — діаграма спрямованості · кільця — хвилі · стрілки — вектор поля E', 'Оболонка — діаграма · кільця — хвилі · стрілки — поле E'],
+  radio: ['Тягніть стік або потенціометр · клік — тумблер · Shift+клік — назад · колесо над потенціометром — точно · тягніть фон — обертати', 'Стіки й тумблери — нижче, на панелі · тягніть фон — обертати'],
+  guides: ['Тягніть — обертати · колесо — масштаб · кроки гайду — праворуч', 'Тягніть — обертати · кроки — нижче'],
+  relay: ['Точки — пакети · лінії — прольоти · червона зона — радіотінь від станції · еліпсоїди — перша зона Френеля', 'Точки — пакети · червона зона — радіотінь']
 };
 const GL_LABEL = {
   build: '3D-модель дрона. Тягніть, щоб обертати; колесо миші або щипок — масштаб.',
   signals: '3D-схема проходження сигналів у дроні.',
-  antennas: '3D-стенд: виносна станція, дрон, діаграми спрямованості антен і хвилі між ними.'
+  antennas: '3D-стенд: виносна станція, дрон, діаграми спрямованості антен і хвилі між ними.',
+  radio: '3D-модель пульта TX16S з робочими органами керування й дрон на арені, що реагує на канали.',
+  guides: '3D-ілюстрація до поточного кроку гайду: вузол дрона або орган керування пульта.'
 };
 
 function specsFor(id) {
@@ -296,18 +303,30 @@ function onModeUI(m) {
   ['build', 'demos', 'config', 'foot'].forEach(id => { $(id).hidden = m !== 'build'; });
   $('sigPanel').hidden = m !== 'signals';
   $('antPanel').hidden = m !== 'antennas';
-  $('platRow').hidden = m === 'antennas';
+  $('radPanel').hidden = m !== 'radio';
+  $('gdPanel').hidden = m !== 'guides';
+  $('platRow').hidden = m === 'antennas' || m === 'radio' || m === 'guides';
   $('tTour').hidden = m !== 'build'; $('tExplode').hidden = m !== 'build';
+  $('tSpin').hidden = m === 'radio' || m === 'guides';
+  document.querySelectorAll('[data-rview]').forEach(b => { b.hidden = m !== 'radio' || !ok3d; });
   $('labHud').hidden = m !== 'antennas' || !ok3d;
+  $('radHud').hidden = m !== 'radio' || !ok3d;
+  $('gdHud').hidden = m !== 'guides' || !ok3d;
   setText($('lede'), LEDE[m]);
-  setHTML($('hint'), `<span class="t-lg">${HINT[m][0]}</span><span class="t-sm">${HINT[m][1]}</span>`);
+  const hk = m === 'antennas' && LAB.sub === 'relay' ? 'relay' : m;
+  setHTML($('hint'), `<span class="t-lg">${HINT[hk][0]}</span><span class="t-sm">${HINT[hk][1]}</span>`);
   $('gl').setAttribute('aria-label', GL_LABEL[m]);
   $('stage').dataset.mode = m;
   if (m === 'signals' && !ok3d) sigRebuild(false);
-  if (m === 'antennas') { labRenderControls(); if (!ok3d) { LAB.res = labSolve(); labReadout(LAB.res); } }
+  if (m === 'antennas') {
+    labRenderControls(); relSync();
+    if (!ok3d) { if (LAB.sub === 'relay') { RLY.res = relSolve(); relReadout(RLY.res); } else { LAB.res = labSolve(); labReadout(LAB.res); } }
+  }
+  if (m === 'radio') { radDirtyUI(); radReadout(); }
 }
+const MODES = ['build', 'signals', 'antennas', 'radio', 'guides'];
 function goMode(m, fromHash) {
-  if (!['build', 'signals', 'antennas'].includes(m)) return;
+  if (!MODES.includes(m)) return;
   if (S.mode === m) return;
   if (ok3d) setMode(m);
   else { S.mode = m; onModeUI(m); }
@@ -354,6 +373,8 @@ function bindUI() {
     if (!ok3d) return;
     if (S.mode === 'signals') { sigRebuild(true); return; }
     if (S.mode === 'antennas') { labFrame(LAB.orbit ? 'orbit' : 'link'); return; }
+    if (S.mode === 'radio') { radFrame(RAD.view === 'free' ? 'pilot' : RAD.view); return; }
+    if (S.mode === 'guides') { gdScene(true); return; }
     stopTour(); stopDemos(); if (S.explodeOn) toggleExplode(false);
     clearSel(); homeView(); ctl.auto = !reduceMotion; updateSpinBtn();
   });
@@ -368,7 +389,7 @@ function init() {
   const startMode = (location.hash || '').slice(1);
   lastCalc = calc();
   renderPlatTabs(); renderStats(lastCalc, null); renderWarns(lastCalc); renderProfile(lastCalc);
-  renderBOM(); renderSlots(); updateDemoUI(); bindUI(); sigUIInit(); labUIInit();
+  renderBOM(); renderSlots(); updateDemoUI(); bindUI(); sigUIInit(); labUIInit(); radUIInit(); gdUIInit();
   if (ok3d) {
     try { initScene(); }
     catch (err) {
@@ -378,7 +399,7 @@ function init() {
   }
   if (!ok3d) $('stage').classList.add('no3d');
   onModeUI(S.mode);
-  if (startMode === 'signals' || startMode === 'antennas') goMode(startMode, true);
-  window.addEventListener('hashchange', () => { const h = (location.hash || '').slice(1); goMode(h === 'signals' || h === 'antennas' ? h : 'build', true); });
+  if (MODES.includes(startMode) && startMode !== 'build') goMode(startMode, true);
+  window.addEventListener('hashchange', () => { const h = (location.hash || '').slice(1); goMode(MODES.includes(h) ? h : 'build', true); });
 }
 init();
