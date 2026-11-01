@@ -15,7 +15,7 @@
   <main class="layout">
   <header class="top">
     <div>
-      <p class="eyebrow">FPV-дрони · будова · сигнали · антени · пульт</p>
+      <p class="eyebrow">FPV-дрони · будова · сигнали · антени · пульт · окуляри</p>
       <h1>Курс по <span>БПЛА</span></h1>
     </div>
     <p class="lede" id="lede"></p>
@@ -24,6 +24,7 @@
       <button type="button" data-mode="signals" aria-pressed="false">Сигнали</button>
       <button type="button" data-mode="antennas" aria-pressed="false">Антени</button>
       <button type="button" data-mode="radio" aria-pressed="false">Пульт</button>
+      <button type="button" data-mode="goggles" aria-pressed="false">Окуляри</button>
       <button type="button" data-mode="guides" aria-pressed="false">Гайди</button>
     </nav>
     <div class="plats" id="platRow">
@@ -56,6 +57,11 @@
         <div class="rh-n"><span>Газ<b id="rhT">—</b></span><span>Висота<b id="rhA">—</b></span><span>LQ<b id="rhL">—</b></span><span>FM<b id="rhF">—</b></span></div>
       </div>
 
+      <div class="rad-hud gog-hud" id="gogHud" hidden aria-live="polite">
+        <div class="rh-top"><b id="ghS">—</b><span id="ghM"></span></div>
+        <div class="rh-n"><span><i id="ghK1">—</i><b id="ghV1">—</b></span><span><i id="ghK2">—</i><b id="ghV2">—</b></span><span><i id="ghK3">—</i><b id="ghV3">—</b></span><span><i id="ghK4">—</i><b id="ghV4">—</b></span></div>
+      </div>
+
       <div class="gd-hud" id="gdHud" hidden aria-live="polite">
         <span class="gh-t" id="ghT"></span><b id="ghS"></b><span class="gh-c" id="ghC"></span>
       </div>
@@ -64,6 +70,9 @@
         <button class="tbtn" type="button" data-rview="pilot" aria-pressed="true" hidden>Пілот</button>
         <button class="tbtn" type="button" data-rview="radio" aria-pressed="false" hidden><span class="t-lg">Пульт крупно</span><span class="t-sm">Пульт</span></button>
         <button class="tbtn" type="button" data-rview="drone" aria-pressed="false" hidden><span class="t-lg">За дроном</span><span class="t-sm">Дрон</span></button>
+        <button class="tbtn" type="button" data-gview="both" aria-pressed="true" hidden><span class="t-lg">Окуляри й екран</span><span class="t-sm">Обидва</span></button>
+        <button class="tbtn" type="button" data-gview="goggles" aria-pressed="false" hidden>Окуляри</button>
+        <button class="tbtn" type="button" data-gview="screen" aria-pressed="false" hidden><span class="t-lg">Очима пілота</span><span class="t-sm">Екран</span></button>
         <button class="tbtn" id="tTour" type="button" aria-pressed="false"><span class="t-lg">Тур по вузлах</span><span class="t-sm">Тур</span></button>
         <button class="tbtn" id="tExplode" type="button" aria-pressed="false">Розібрати</button>
         <button class="tbtn" id="tSpin" type="button" aria-pressed="true">Обертання</button>
@@ -313,6 +322,52 @@
           </ul>
         </details>
         <p class="foot">Симулятор спрощений: ідеальний регулятор, оцінна тяга, без вітру. Розміри дрона й арени умовні. Назви режимів, прапорців і параметрів — як у Betaflight та EdgeTX; конкретні значення за замовчуванням залежать від версії прошивки.</p>
+      </section>
+
+      <section class="block gog" id="gogPanel" aria-labelledby="hGog" hidden>
+        <div class="bhead"><h2 id="hGog">Окуляри</h2><p class="eyebrow">Аналог · цифра</p></div>
+        <p class="sub">Окуляри — екран пілота. Аналогові приймають відео з VTX на одному з 48 каналів 5,8 ГГц і на слабкому сигналі показують шум. Цифрові з’єднуються з прив’язаним повітряним модулем: картинка HD тримається до межі, а потім зависає. Кнопки й порядок дій — за посібниками виробників.</p>
+        <div class="seg gd-tabs" id="gogDev" role="group" aria-label="Тип окулярів"><button type="button" data-gdev="an">Аналог · Skyzone SKY04X Pro</button><button type="button" data-gdev="dg">Цифра · DJI Goggles 3</button></div>
+        <div class="rad-stat" id="gogStat" aria-live="polite"></div>
+        <p class="gog-led" id="gogLed" hidden></p>
+
+        <h3 class="rad-h">Органи керування</h3>
+        <p class="sub">Ті самі дії — кліком по окулярах у 3D (утримання кнопки — довге натискання, колесо миші над колесом — прокрутка) або кнопками нижче.</p>
+        <div class="gk" id="gogCtl"></div>
+        <div class="rad-act"><button type="button" class="tbtn" id="gogLbl" aria-pressed="false">Підписи на окулярах</button></div>
+
+        <h3 class="rad-h">Дрон і радіолінія</h3>
+        <div id="gogLink"></div>
+        <div class="lab-row top"><span class="lab-k">Типові проблеми</span><div class="seg sm scen" id="gogScen" role="group" aria-label="Сценарії"></div></div>
+        <p class="note scen-note" id="gogScenNote" hidden></p>
+
+        <h3 class="rad-h">Як користуватись</h3>
+        <div class="gd-bar">
+          <button type="button" class="tbtn" id="gogPrev" aria-label="Попередній крок">‹</button>
+          <button type="button" class="tbtn" id="gogNext" aria-label="Наступний крок">›</button>
+          <span class="sig-pos" id="gogPos">1 / 1</span>
+        </div>
+        <ol class="gsteps" id="gogSteps"></ol>
+
+        <details class="guide">
+          <summary>Аналог чи цифра</summary>
+          <ul>
+            <li><b>Картинка.</b> Аналог — стандартна роздільність і шум на межі прийому; цифра — 1080p, чиста майже до кінця, а потім квадрати й зависання.</li>
+            <li><b>Затримка.</b> Аналог передає кадр без стиснення й буфера; цифрова система стискає відео, але сучасна дає близько 20–40 мс.</li>
+            <li><b>Сумісність.</b> Аналоговий VTX бачать будь-які аналогові окуляри на тому самому каналі. Цифрові окуляри працюють лише з прив’язаним модулем своєї системи.</li>
+            <li><b>Поруч з іншими.</b> Аналог займає канал для всіх у зоні прийому — канали треба ділити. Цифрова система обирає канал сама або вручну, а Race Mode звужує смугу.</li>
+          </ul>
+        </details>
+        <details class="guide">
+          <summary>Догляд і безпека</summary>
+          <ul>
+            <li>Не лишайте окуляри лінзами до сонця: лінзи фокусують промені й пропалюють екрани.</li>
+            <li>Лінзи протирайте мікрофіброю, без спирту й розчинників.</li>
+            <li>Не тримайте VTX чи повітряний модуль увімкненим без обдуву: вони перегріваються.</li>
+            <li>Робіть перерви: тривалий політ в окулярах втомлює очі. Якщо цього вимагають правила, літайте з помічником-спостерігачем.</li>
+          </ul>
+        </details>
+        <p class="foot">Модель радіолінії спрощена: рівень, шум і бітрейт — оцінки для навчання, а не паспортні дані. 3D-моделі узагальнені й не повторюють дизайн конкретних окулярів; назви кнопок і порядок дій — за посібниками SKY04X Pro і DJI Goggles 3, у нових прошивках меню можуть відрізнятися. Користуйтеся лише дозволеними частотами й потужностями.</p>
       </section>
 
       <section class="block gd" id="gdPanel" aria-labelledby="hGd" hidden>

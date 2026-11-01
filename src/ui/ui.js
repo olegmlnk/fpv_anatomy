@@ -10,6 +10,7 @@ import { LAB, labFrame, labOpenFrom, labReadout, labRenderControls, labSolve, la
 import { relReadout, relSolve, relSync, RLY } from '../sections/relay.js';
 import { RAD, radDirtyUI, radFrame, radReadout, radUIInit } from '../sections/radio.js';
 import { gdScene, gdUIInit } from '../sections/guides.js';
+import { GOG, gogFrame, gogReadout, gogSync, gogUIInit } from '../sections/goggles.js';
 
 /* ================= UI: MODES, PLATFORMS, BOM, DEMOS, CONFIGURATOR, DRAWER ================= */
 export const $ = id => document.getElementById(id);
@@ -25,6 +26,7 @@ const LEDE = {
   signals: 'Оберіть ланцюжок — і сигнал пройде дроном крок за кроком: звідки, куди й яким протоколом. Схема перебудовується під вибрані компоненти й платформу.',
   antennas: 'Стенд «виносна станція ↔ дрон»: оберіть антени, поляризацію, відстань і положення дрона — і подивіться, чому зв’язок є або зникає.',
   radio: 'Пульт TX16S: рухайте стіки, клацайте тумблери, крутіть потенціометри. Призначайте канали й режими Betaflight — дрон на арені реагує на те, що дійшло до польотника.',
+  goggles: 'Окуляри: аналогові Skyzone SKY04X Pro і цифрові DJI Goggles 3. Увімкніть, налаштуйте канал або прив’яжіть модуль, увімкніть запис — і подивіться очима пілота, як картинка реагує на відстань, перешкоди й помилки.',
   guides: 'Покрокові гайди: польотник на Betaflight, пульт на EdgeTX і радіолінія ExpressLRS. Загальний порядок без прив’язки до конкретної плати; 3D-сцена показує, про що йдеться на кроці.'
 };
 const HINT = {
@@ -32,6 +34,7 @@ const HINT = {
   signals: ['Тягніть — обертати · колесо або щипок — масштаб · кроки ланцюжка — праворуч', 'Тягніть — обертати · кроки ланцюжка — нижче'],
   antennas: ['Оболонка — діаграма спрямованості · кільця — хвилі · стрілки — вектор поля E', 'Оболонка — діаграма · кільця — хвилі · стрілки — поле E'],
   radio: ['Тягніть стік або потенціометр · клік — тумблер · Shift+клік — назад · колесо над потенціометром — точно · тягніть фон — обертати', 'Стіки й тумблери — нижче, на панелі · тягніть фон — обертати'],
+  goggles: ['Клік по кнопці окулярів — натиснути · утримати — довге натискання · колесо миші над колесом — прокрутити · тягніть фон — обертати', 'Кнопки окулярів — нижче, на панелі · тягніть фон — обертати'],
   guides: ['Тягніть — обертати · колесо — масштаб · кроки гайду — праворуч', 'Тягніть — обертати · кроки — нижче'],
   relay: ['Точки — пакети · лінії — прольоти · червона зона — радіотінь від станції · еліпсоїди — перша зона Френеля', 'Точки — пакети · червона зона — радіотінь']
 };
@@ -40,6 +43,7 @@ const GL_LABEL = {
   signals: '3D-схема проходження сигналів у дроні.',
   antennas: '3D-стенд: виносна станція, дрон, діаграми спрямованості антен і хвилі між ними.',
   radio: '3D-модель пульта TX16S з робочими органами керування й дрон на арені, що реагує на канали.',
+  goggles: '3D-модель окулярів з робочими кнопками й екран, що показує картинку очима пілота.',
   guides: '3D-ілюстрація до поточного кроку гайду: вузол дрона або орган керування пульта.'
 };
 
@@ -313,13 +317,16 @@ export function onModeUI(m) {
   $('sigPanel').hidden = m !== 'signals';
   $('antPanel').hidden = m !== 'antennas';
   $('radPanel').hidden = m !== 'radio';
+  $('gogPanel').hidden = m !== 'goggles';
   $('gdPanel').hidden = m !== 'guides';
-  $('platRow').hidden = m === 'antennas' || m === 'radio' || m === 'guides';
+  $('platRow').hidden = m === 'antennas' || m === 'radio' || m === 'goggles' || m === 'guides';
   $('tTour').hidden = m !== 'build'; $('tExplode').hidden = m !== 'build';
-  $('tSpin').hidden = m === 'radio' || m === 'guides';
+  $('tSpin').hidden = m === 'radio' || m === 'goggles' || m === 'guides';
   document.querySelectorAll('[data-rview]').forEach(b => { b.hidden = m !== 'radio' || !ok3d; });
+  document.querySelectorAll('[data-gview]').forEach(b => { b.hidden = m !== 'goggles' || !ok3d; });
   $('labHud').hidden = m !== 'antennas' || !ok3d;
   $('radHud').hidden = m !== 'radio' || !ok3d;
+  $('gogHud').hidden = m !== 'goggles' || !ok3d;
   $('gdHud').hidden = m !== 'guides' || !ok3d;
   setText($('lede'), LEDE[m]);
   const hk = m === 'antennas' && LAB.sub === 'relay' ? 'relay' : m;
@@ -333,8 +340,9 @@ export function onModeUI(m) {
     if (!ok3d) { if (LAB.sub === 'relay') { RLY.res = relSolve(); relReadout(RLY.res); } else { LAB.res = labSolve(); labReadout(LAB.res); } }
   }
   if (m === 'radio') { radDirtyUI(); radReadout(); }
+  if (m === 'goggles') { gogSync(); gogReadout(); }
 }
-const MODES = ['build', 'signals', 'antennas', 'radio', 'guides'];
+const MODES = ['build', 'signals', 'antennas', 'radio', 'goggles', 'guides'];
 export function goMode(m, fromHash) {
   if (!MODES.includes(m)) return;
   if (S.mode === m) return;
@@ -384,6 +392,7 @@ function bindUI() {
     if (S.mode === 'signals') { sigRebuild(true); return; }
     if (S.mode === 'antennas') { labFrame(LAB.orbit ? 'orbit' : 'link'); return; }
     if (S.mode === 'radio') { radFrame(RAD.view === 'free' ? 'pilot' : RAD.view); return; }
+    if (S.mode === 'goggles') { gogFrame(GOG.view); return; }
     if (S.mode === 'guides') { gdScene(true); return; }
     stopTour(); stopDemos(); if (S.explodeOn) toggleExplode(false);
     clearSel(); homeView(); ctl.auto = !reduceMotion; updateSpinBtn();
@@ -399,7 +408,7 @@ export function init() {
   const startMode = (location.hash || '').slice(1);
   lastCalc = calc();
   renderPlatTabs(); renderStats(lastCalc, null); renderWarns(lastCalc); renderProfile(lastCalc);
-  renderBOM(); renderSlots(); updateDemoUI(); bindUI(); sigUIInit(); labUIInit(); radUIInit(); gdUIInit();
+  renderBOM(); renderSlots(); updateDemoUI(); bindUI(); sigUIInit(); labUIInit(); radUIInit(); gogUIInit(); gdUIInit();
   if (ok3d) {
     try { initScene(); }
     catch (err) {

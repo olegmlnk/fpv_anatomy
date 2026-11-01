@@ -1,5 +1,5 @@
 /* Smoke-тест: відкриває зібрану сторінку (dist/) на десктопній і мобільній ширині, проходить усі платформи й розділи
- * (3D-будова, Сигнали, Антени з ретранслятором, Пульт, Гайди), анімації, варіанти конфігуратора, сценарії
+ * (3D-будова, Сигнали, Антени з ретранслятором, Пульт, Окуляри, Гайди), анімації, варіанти конфігуратора, сценарії
  * антенного стенду, ретранслятора й пульта, усі кроки гайдів і бічну панель.
  * Перевіряє помилки консолі та горизонтальне прокручування.
  * Запуск: npm install && npx playwright install chromium && npm test (спершу збирає dist/) */
@@ -40,6 +40,9 @@ const SCENARIOS = ['ok', 'lhcp', 'mix', 'roll', 'beam', 'over', 'band', 'far'];
 const RELAY = ['none', 'top', 'analog', 'same', 'e9', 'low'];
 const RADIO = ['trim', 'map', 'rev', 'arm3', 'early', 'fs', 'ok'];
 const SWITCHES = ['SA', 'SB', 'SC', 'SD', 'SE', 'SF', 'SG'];
+const GOG_AN = ['ch', 'pol', 'far', 'pit', 'sd', 'ok'];
+const GOG_DG = ['bind', 'weak', 'ants', 'osd', 'heat', 'sd', 'ok'];
+const GOG_KEYS = { an: ['aRW:press', 'aRW:up', 'aRW:press', 'aRW:down', 'aRW:hold', 'aRB:press', 'aLW:press', 'aRB:press', 'aLB:press', 'aLB:press', 'aPWR:press'], dg: ['d5D:press', 'd5D:down', 'd5D:right', 'dBACK:press', 'd5D:up', 'dBACK:press', 'd5D:down', 'd5D:press', 'dRV:double', 'dPWR:press'] };
 const VIEWPORTS = [
   { name: 'desktop', full: true, viewport: { width: 1440, height: 900 } },
   { name: 'mobile', full: false, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
@@ -111,6 +114,21 @@ const VIEWPORTS = [
     await overflow();
     await page.screenshot({ path: path.join(shotsDir, `${name}-radio.png`) });
 
+    /* окуляри: обидва типи, сценарії, кнопки, кроки інструкції */
+    await mode('goggles'); await page.waitForTimeout(500);
+    const goggles = {};
+    for (const dev of ['an', 'dg']) {
+      await click(`#gogDev [data-gdev="${dev}"]`); await page.waitForTimeout(200);
+      for (const s of (dev === 'an' ? GOG_AN : GOG_DG)) { await click(`#gogScen [data-gscn="${s}"]`); await page.waitForTimeout(150); }
+      for (const k of GOG_KEYS[dev]) { await click(`[data-gk="${k}"]`); await page.waitForTimeout(60); }
+      const n = await page.$$eval('#gogSteps > li', l => l.length);
+      for (let i = 1; i < n; i++) { await click('#gogNext'); await page.waitForTimeout(40); }
+      for (const v of ['goggles', 'screen', 'both']) if (webgl) { await click(`[data-gview="${v}"]`); await page.waitForTimeout(150); }
+      goggles[dev] = { steps: n, verdict: await page.$eval('#gogStat b', el => el.textContent) };
+    }
+    await overflow();
+    await page.screenshot({ path: path.join(shotsDir, `${name}-goggles.png`), timeout: 120000 });
+
     /* гайди: усі кроки всіх трьох */
     await mode('guides'); await page.waitForTimeout(400);
     let steps = 0;
@@ -130,8 +148,8 @@ const VIEWPORTS = [
     await overflow();
     await page.screenshot({ path: path.join(shotsDir, `${name}.png`) });
 
-    const ok = errors.length === 0 && drawerOpen && videoPath === 2 && maxOverflow <= 0 && !!verdict && !!relay && layers && armed && steps === 34;
-    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: webgl=${webgl} swaps=${swaps} drawer=${drawerOpen} videoPath=${videoPath} lab="${verdict}" relay="${relay}" layers=${layers} armed=${armed} guideSteps=${steps} overflow=${maxOverflow}px errors=${errors.length}`);
+    const ok = errors.length === 0 && drawerOpen && videoPath === 2 && maxOverflow <= 0 && !!verdict && !!relay && layers && armed && steps === 34 && goggles.an.steps === 10 && goggles.dg.steps === 10 && !!goggles.an.verdict && !!goggles.dg.verdict;
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: webgl=${webgl} swaps=${swaps} drawer=${drawerOpen} videoPath=${videoPath} lab="${verdict}" relay="${relay}" layers=${layers} armed=${armed} goggles="${goggles.an.verdict}/${goggles.dg.verdict}" guideSteps=${steps} overflow=${maxOverflow}px errors=${errors.length}`);
     errors.forEach(e => console.log('  ' + e));
     if (!ok) failed = true;
     await ctx.close();

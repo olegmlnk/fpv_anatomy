@@ -5,8 +5,9 @@ import { goMode, init } from './ui/ui.js';
 import { FCS } from './sections/radio.js';
 import { RLY, relSetSub } from './sections/relay.js';
 import { LAB } from './sections/antlab.js';
+import { GOG } from './sections/goggles.js';
 
 init();
 
 /* Хук для автотестів і налагодження з консолі: стан розділів і перемикачі режимів. */
-window.__fpv = { S, FCS, RLY, LAB, goMode, relSetSub };
+window.__fpv = { S, FCS, RLY, LAB, GOG, goMode, relSetSub };

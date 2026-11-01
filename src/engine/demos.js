@@ -9,6 +9,7 @@ import { sigEnter, sigExit, sigInit, sigRebuild, sigTheme, tickSig } from '../se
 import { labEnter, labExit, labInit, labTheme, tickLab } from '../sections/antlab.js';
 import { RAD, radDblClick, radDown, radEnter, radExit, radHover, radInit, radMove, radOwns, radPtrOn, radTheme, radUp, radWheel, tickRad } from '../sections/radio.js';
 import { guideEnter, guideExit, tickGuide } from '../sections/guides.js';
+import { gogDown, gogEnter, gogExit, gogHover, gogInit, gogOwns, gogPtrOn, gogTheme, gogUp, gogWheel, GOG, tickGog } from '../sections/goggles.js';
 import { onModeUI, onSelectUI, openDrawer, updateDemoUI } from '../ui/ui.js';
 
 /* ================= DEMOS, MODES, REBUILD, LOOP, POINTER ================= */
@@ -243,11 +244,12 @@ export function setMode(m) {
   if (S.explodeOn) { S.explodeOn = false; document.getElementById('tExplode').setAttribute('aria-pressed', 'false'); }
   S.sel = null; S.ghost = false; S.hover = null;
   if (ok3d) {
-    const lab = m === 'antennas', rad = m === 'radio', away = lab || rad || m === 'guides';
+    const lab = m === 'antennas', rad = m === 'radio', gog = m === 'goggles', away = lab || rad || gog || m === 'guides';
     root.visible = !away; matMesh.visible = !away; shadowMesh.visible = !away; wbLine.visible = !away;
     if (m === 'signals') sigEnter(); else sigExit();
     if (lab) labEnter(); else labExit();
     if (rad) radEnter(); else radExit();
+    if (gog) gogEnter(); else gogExit();
     if (m === 'guides') guideEnter(); else guideExit();
     if (m === 'build') { homeView(); ctl.auto = !reduceMotion; updateSpinBtn(); }
     applyLook();
@@ -314,7 +316,7 @@ export function initScene() {
   for (let i = 0; i < 6; i++) arrows.push(makeArrow());
   brkHover = makeBrackets(0.55); brkSel = makeBrackets(1);
   makeUSB(); makeRadio();
-  sigInit(); labInit(); radInit();
+  sigInit(); labInit(); radInit(); gogInit();
   ctl = { target: new T.Vector3(0, 2.4, 0.3), tTarget: new T.Vector3(0, 2.4, 0.3), yaw: 2.45, tYaw: 2.45, pitch: 0.44, tPitch: 0.44, dist: 46, tDist: 46, auto: !reduceMotion, drag: false };
   raycaster = new T.Raycaster(); ndc = new T.Vector2();
   rebuild(ORDER.slice(), true);
@@ -327,7 +329,7 @@ export function initScene() {
     readTheme(); drawMat(); updatePropHands();
     wbLine.material.color.copy(C(TC['--ink']));
     [brkHover, brkSel].forEach(b => b.material.color.copy(C(TC['--accent'])));
-    sigTheme(); labTheme(); radTheme();
+    sigTheme(); labTheme(); radTheme(); gogTheme();
     applyLook();
   };
   if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
@@ -362,6 +364,7 @@ function loop(nowMs) {
   if (S.mode === 'signals') tickSig(dt, now);
   if (S.mode === 'antennas') tickLab(dt, now);
   if (S.mode === 'radio') tickRad(dt, now);
+  if (S.mode === 'goggles') tickGog(dt, now);
   if (S.mode === 'guides') tickGuide(dt, now);
 
   const showNums = S.ex > 0.5 && S.mode === 'build';
@@ -382,17 +385,19 @@ function loop(nowMs) {
 /* ---------- pointer ---------- */
 function bindPointer() {
   const ptrs = new Map(); let down = null, pinch = 0, lastTap = { id: null, t: 0 };
-  const hoverAt = (x, y) => { if (radPtrOn()) { radHover(x, y); return; } setHover(S.mode === 'build' ? pick(x, y) : null); };
+  const hoverAt = (x, y) => { if (radPtrOn()) { radHover(x, y); return; } if (gogPtrOn()) { gogHover(x, y); return; } setHover(S.mode === 'build' ? pick(x, y) : null); };
   canvas.addEventListener('pointerdown', e => {
     canvas.setPointerCapture(e.pointerId);
     /* у розділі «Пульт» вказівник на органі керування рухає його, а не камеру */
     if (radPtrOn() && radDown(e)) return;
+    if (gogPtrOn() && gogDown(e)) return;
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     down = { x: e.clientX, y: e.clientY, moved: false, type: e.pointerType };
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); }
   });
   canvas.addEventListener('pointermove', e => {
     if (radOwns(e.pointerId)) { radMove(e); return; }
+    if (gogOwns(e.pointerId)) return;
     const p = ptrs.get(e.pointerId);
     if (!p) { if (e.pointerType === 'mouse') hoverAt(e.clientX, e.clientY); return; }
     const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
@@ -414,6 +419,7 @@ function bindPointer() {
   });
   const end = e => {
     if (radOwns(e.pointerId)) { radUp(e); return; }
+    if (gogOwns(e.pointerId)) { gogUp(e); return; }
     const had = ptrs.has(e.pointerId); ptrs.delete(e.pointerId);
     if (ptrs.size < 2) pinch = 0;
     if (!had) return;
@@ -431,7 +437,7 @@ function bindPointer() {
   canvas.addEventListener('pointercancel', end);
   canvas.addEventListener('pointerleave', e => {
     if (e.pointerType !== 'mouse' || ptrs.size) return;
-    if (radPtrOn()) { RAD.hover = null; canvas.classList.remove('hovering'); } else setHover(null);
+    if (radPtrOn()) { RAD.hover = null; canvas.classList.remove('hovering'); } else if (gogPtrOn()) { GOG.hover = null; canvas.classList.remove('hovering'); } else setHover(null);
   });
   canvas.addEventListener('dblclick', e => {
     if (radPtrOn()) { radDblClick(e); return; }
@@ -440,6 +446,7 @@ function bindPointer() {
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     if (radPtrOn() && radWheel(e)) return;
+    if (gogPtrOn() && gogWheel(e)) return;
     ctl.tDist = Math.min(400, Math.max(1.5, ctl.tDist * Math.exp(e.deltaY * 0.0011)));
   }, { passive: false });
 }
