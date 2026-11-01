@@ -83,9 +83,15 @@ const VIEWPORTS = [
     for (const s of RELAY) { await click(`#relScen [data-rscn="${s}"]`); await page.waitForTimeout(200); }
     await click('#relView [data-rview2="build"]'); await page.waitForTimeout(600);
     await click('#relView [data-rview2="link"]'); await page.waitForTimeout(200);
+    let layers = true;
+    for (const id of ['#relShade', '#relFres']) {
+      await click(id); const off = await page.$eval(id, el => el.getAttribute('aria-pressed'));
+      await click(id); const on = await page.$eval(id, el => el.getAttribute('aria-pressed'));
+      layers = layers && off === 'false' && on === 'true';
+    }
     await overflow();
     const relay = await page.$eval('#relVerdict b', el => el.textContent);
-    await page.screenshot({ path: path.join(shotsDir, `${name}-relay.png`) });
+    await page.screenshot({ path: path.join(shotsDir, `${name}-relay.png`), timeout: 120000 });
     await click('#antSub [data-asub="lab"]'); await page.waitForTimeout(200);
 
     /* пульт: тумблери, сценарії, армування */
@@ -118,8 +124,8 @@ const VIEWPORTS = [
     await overflow();
     await page.screenshot({ path: path.join(shotsDir, `${name}.png`) });
 
-    const ok = errors.length === 0 && drawerOpen && videoPath === 2 && maxOverflow <= 0 && !!verdict && !!relay && armed && steps === 34;
-    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: webgl=${webgl} swaps=${swaps} drawer=${drawerOpen} videoPath=${videoPath} lab="${verdict}" relay="${relay}" armed=${armed} guideSteps=${steps} overflow=${maxOverflow}px errors=${errors.length}`);
+    const ok = errors.length === 0 && drawerOpen && videoPath === 2 && maxOverflow <= 0 && !!verdict && !!relay && layers && armed && steps === 34;
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: webgl=${webgl} swaps=${swaps} drawer=${drawerOpen} videoPath=${videoPath} lab="${verdict}" relay="${relay}" layers=${layers} armed=${armed} guideSteps=${steps} overflow=${maxOverflow}px errors=${errors.length}`);
     errors.forEach(e => console.log('  ' + e));
     if (!ok) failed = true;
     await ctx.close();

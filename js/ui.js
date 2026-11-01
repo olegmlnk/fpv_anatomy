@@ -315,6 +315,7 @@ function onModeUI(m) {
   setText($('lede'), LEDE[m]);
   const hk = m === 'antennas' && LAB.sub === 'relay' ? 'relay' : m;
   setHTML($('hint'), `<span class="t-lg">${HINT[hk][0]}</span><span class="t-sm">${HINT[hk][1]}</span>`);
+  $('hint').classList.toggle('on-scene', hk === 'relay');
   $('gl').setAttribute('aria-label', GL_LABEL[m]);
   $('stage').dataset.mode = m;
   if (m === 'signals' && !ok3d) sigRebuild(false);

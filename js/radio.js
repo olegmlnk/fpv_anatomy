@@ -1122,6 +1122,8 @@ function radAction(a) {
 }
 function radResetAll(full) {
   FCS.armed = false; FCS.turtle = false; FCS.fs = 0; FCS.lostT = 0; FCS.latch = false; FCS.badrx = false; FCS.landing = false;
+  /* скидання = зв’язок є, ARM вимкнено: інакше ARM, увімкнений до першого кроку симуляції, дав би хибний BADRX */
+  FCS.hadRx = true; FCS.prevArm = false;
   FCS.timer = 0; FCS.used = 0; FCS.msg = ''; FCS.last = null;
   RAD.link = true; RAD.earlyT = 0; RAD.warn = null; RAD.power = true; RAD.demo = null; RAD.demoT = 0;
   SW_ORDER.forEach(k => { RAD.sw[k] = 0; RAD.swDir[k] = 1; });

@@ -205,7 +205,7 @@
         </div>
 
         <div class="rel" id="relBody" hidden>
-          <p class="sub">Станція за кілька кілометрів від дрона, а між ними — пагорб. Порівняйте зв’язок напряму й через ретранслятор на вершині, подивіться, з чого він складається і чому приймати й передавати треба на різних частотах.</p>
+          <p class="sub">Станція в долині, дрон — за лісистою горою за кілька кілометрів. Порівняйте зв’язок напряму й через ретранслятор на вершині, подивіться, з чого він складається і чому приймати й передавати треба на різних частотах.</p>
           <div class="lab-row"><span class="lab-k">Канал</span><div class="seg sm" id="relCh" role="group" aria-label="Радіоканал"></div></div>
           <div class="lab-row top"><span class="lab-k">Сценарії</span><div class="seg sm scen" id="relScen" role="group" aria-label="Готові сценарії"></div></div>
           <p class="note scen-note" id="relScenNote" hidden></p>
@@ -213,12 +213,12 @@
           <div class="lab-row"><span class="lab-k">Тип</span><div class="seg sm" id="relKind" role="group" aria-label="Тип ретранслятора"><button type="button" data-rkind="digital">Цифровий</button><button type="button" data-rkind="analog">Аналоговий</button></div></div>
           <div class="lab-row"><span class="lab-k">Частоти</span><div class="seg sm" id="relFreq" role="group" aria-label="Частоти прийому й передачі"><button type="button" data-rfreq="diff">Прийом f1, передача f2</button><button type="button" data-rfreq="same">Той самий канал</button></div></div>
           <div class="lab-row"><span class="lab-k">Потужність</span><div class="seg sm" id="relPw" role="group" aria-label="Потужність передавачів"></div></div>
-          <label class="slider" for="relD1"><span>До пагорба</span><input type="range" id="relD1" min="3" max="50" step="1"><output id="relD1Out" for="relD1"></output></label>
-          <label class="slider" for="relD2"><span>За пагорбом</span><input type="range" id="relD2" min="3" max="50" step="1"><output id="relD2Out" for="relD2"></output></label>
-          <label class="slider" for="relHill"><span>Пагорб</span><input type="range" id="relHill" min="0" max="300" step="5"><output id="relHillOut" for="relHill"></output></label>
+          <label class="slider" for="relD1"><span>До гори</span><input type="range" id="relD1" min="3" max="50" step="1"><output id="relD1Out" for="relD1"></output></label>
+          <label class="slider" for="relD2"><span>За горою</span><input type="range" id="relD2" min="3" max="50" step="1"><output id="relD2Out" for="relD2"></output></label>
+          <label class="slider" for="relHill"><span>Висота гори</span><input type="range" id="relHill" min="0" max="300" step="5"><output id="relHillOut" for="relHill"></output></label>
           <label class="slider" for="relAlt"><span>Висота дрона</span><input type="range" id="relAlt" min="5" max="300" step="5"><output id="relAltOut" for="relAlt"></output></label>
           <div class="lab-row"><span class="lab-k">Показати</span><div class="seg sm" id="relView" role="group" aria-label="Вигляд"><button type="button" data-rview2="link">Зв’язок</button><button type="button" data-rview2="build">Будова ретранслятора</button></div></div>
-          <div class="lab-row"><span class="lab-k">Шари</span><div class="seg sm"><button type="button" id="relFres" aria-pressed="true">Зона Френеля</button></div></div>
+          <div class="lab-row"><span class="lab-k">Шари</span><div class="seg sm"><button type="button" id="relShade" aria-pressed="true">Радіотінь</button><button type="button" id="relFres" aria-pressed="true">Зона Френеля</button></div></div>
           <div class="lab-verdict" id="relVerdict" aria-live="polite"></div>
           <dl class="budget" id="relBudget"></dl>
           <ul class="warns why" id="relWhy"></ul>
@@ -256,7 +256,7 @@
               <li><b>Правила.</b> Частоти й потужність — лише в межах дозволеного; вимоги до ретрансляторів залежать від країни.</li>
             </ul>
           </details>
-          <p class="foot">Модель спрощена: рельєф — одна вершина (дифракція на «ножовій» перешкоді за ITU-R P.526), без відбиттів, рослинності й кривизни Землі. Сцену стиснуто по горизонталі й розтягнуто по вертикалі; розрахунок — у справжніх метрах.</p>
+          <p class="foot">Модель спрощена: у розрахунку рельєф — одна вершина (дифракція на «ножовій» перешкоді за ITU-R P.526), без відбиттів, втрат у лісі й кривизни Землі; ліс, озеро й передгір’я — для наочності. Сцену стиснуто по горизонталі й розтягнуто по вертикалі; розрахунок — у справжніх метрах.</p>
         </div>
       </section>
 
