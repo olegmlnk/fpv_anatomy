@@ -1,30 +1,32 @@
-/* Курс по БПЛА · стан, оверлеї, підсвітка, камера, мітки, вибір, тур.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
-'use strict';
+/* Курс по БПЛА · стан, оверлеї, підсвітка, камера, мітки, вибір, тур. */
+import * as T from 'three';
+import { COMP, ORDER } from '../data/content.js';
+import { cfg, numN, plat } from '../data/options.js';
+import { armStart, box, C, camera, canvas, comps, css, cyl, glowSprite, L, labelsEl, narrowMQ, ok3d, overlay, renderer, rrect, scene, stageEl, TC, v3 } from './core.js';
+import { ctl, matMesh, shadowMesh, stopDemos } from './demos.js';
+import { onHoverUI, onSelectUI, specsFor } from '../ui/ui.js';
+
 /* ================= STATE, OVERLAYS, LOOK, CAMERA, SELECTION ================= */
-const S = { mode: 'build', hover: null, sel: null, ghost: false, explodeOn: false, ex: 0, demo: null, tour: false, tourI: 0, tourT: 0, peekId: null, wiresVis: true, ver: 0 };
-const MOT = { mode: 'idle', dir: 'in', thr: 0.35, ang: [0, 0, 0, 0, 0, 0], vis: [0, 0, 0, 0, 0, 0], ti: 0, tt: 0 };
-const FC = { mode: 'run', t: 0, prog: 0, usb: 0, usbT: 0, btn: 0, flashed: false };
-const RX = { mode: 'nolink', t: 0, spawn: 0, tele: 0 };
+export const S = { mode: 'build', hover: null, sel: null, ghost: false, explodeOn: false, ex: 0, demo: null, tour: false, tourI: 0, tourT: 0, peekId: null, wiresVis: true, ver: 0 };
+export const MOT = { mode: 'idle', dir: 'in', thr: 0.35, ang: [0, 0, 0, 0, 0, 0], vis: [0, 0, 0, 0, 0, 0], ti: 0, tt: 0 };
+export const FC = { mode: 'run', t: 0, prog: 0, usb: 0, usbT: 0, btn: 0, flashed: false };
+export const RX = { mode: 'nolink', t: 0, spawn: 0, tele: 0 };
 const POS_NAMES = { quad: ['задній правий', 'передній правий', 'задній лівий', 'передній лівий'], hex: ['задній правий', 'передній правий', 'задній лівий', 'передній лівий', 'правий', 'лівий'] };
-const motorNames = () => POS_NAMES[plat().mixer];
-const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const narrowMQ = window.matchMedia('(max-width: 900px)');
+export const motorNames = () => POS_NAMES[plat().mixer];
 /* +1 = проти годинникової (CCW), −1 = за годинниковою (CW), вигляд згори; таблиці mixerQuadX / mixerHex6X Betaflight */
-function motorDirs() {
+export function motorDirs() {
   const d = plat().mixer === 'hex' ? [1, 1, -1, -1, -1, 1] : [-1, 1, 1, -1];
   return MOT.dir === 'in' ? d : d.map(v => -v);
 }
-const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-const wrapPi = a => Math.atan2(Math.sin(a), Math.cos(a));
-const kScale = () => (plat().micro ? 0.32 : 1);
+export const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+export const wrapPi = a => Math.atan2(Math.sin(a), Math.cos(a));
+export const kScale = () => (plat().micro ? 0.32 : 1);
 
-let ctl, raycaster, ndc, pickables = [], arrows = [], brkHover, brkSel, matTex, matMesh, shadowMesh, wbLine;
-let usbG, radio, packets = [], rings = [], flashDots = [], flashCurve = null;
+export let arrows = [], matTex, wbLine;
+export let usbG, radio, packets = [], rings = [], flashDots = [];
 
 /* ---------- environment & mat ---------- */
-function buildEnv() {
+export function buildEnv() {
   const pm = new T.PMREMGenerator(renderer), env = new T.Scene();
   env.add(new T.Mesh(new T.BoxGeometry(40, 24, 40), new T.MeshBasicMaterial({ color: new T.Color(0.28, 0.3, 0.3), side: T.BackSide })));
   const panel = (w, h, pos, rot, k) => {
@@ -38,7 +40,7 @@ function buildEnv() {
   scene.environment = pm.fromScene(env, 0.035).texture;
   pm.dispose();
 }
-function drawMat() {
+export function drawMat() {
   const size = 1024, span = 52, px = size / span;
   const cnv = matTex ? matTex.image : document.createElement('canvas');
   cnv.width = cnv.height = size;
@@ -65,14 +67,14 @@ function drawMat() {
   if (matTex) matTex.needsUpdate = true;
   else { matTex = new T.CanvasTexture(cnv); matTex.encoding = T.sRGBEncoding; matTex.anisotropy = 8; }
 }
-function scaleMat() {
+export function scaleMat() {
   const s = cfg.platform === 'p10' || cfg.platform === 'hex' ? 1.9 : cfg.platform === 'p7' ? 1.4 : 1;
   matMesh.scale.set(s, s, s); shadowMesh.scale.set(plat().micro ? 0.36 : s, plat().micro ? 0.36 : s, 1);
 }
 
 /* ---------- overlay objects ---------- */
 const basicMat = (hex, o = 1, extra = {}) => new T.MeshBasicMaterial(Object.assign({ color: C(hex), transparent: true, opacity: o, depthWrite: false, toneMapped: false }, extra));
-function makeArrow() {
+export function makeArrow() {
   const g = new T.Group(), inner = new T.Group(); inner.rotation.x = -Math.PI / 2; g.add(inner);
   const mat = basicMat('#ffffff', 0.95);
   const R = 2.5, arc = Math.PI * 1.35;
@@ -82,14 +84,14 @@ function makeArrow() {
   g.userData.mat = mat; g.visible = false; overlay.add(g);
   return g;
 }
-function makeBrackets(op) {
+export function makeBrackets(op) {
   const geo = new T.BufferGeometry();
   geo.setAttribute('position', new T.Float32BufferAttribute(new Float32Array(144), 3));
   const l = new T.LineSegments(geo, new T.LineBasicMaterial({ color: C(TC['--accent']), transparent: true, opacity: op, depthTest: false, toneMapped: false }));
   l.renderOrder = 999; l.frustumCulled = false; l.visible = false; overlay.add(l);
   return l;
 }
-function setBrackets(l, b) {
+export function setBrackets(l, b) {
   const a = l.geometry.attributes.position.array, mn = b.min, mx = b.max;
   const sx = (mx.x - mn.x) * 0.22, sy = (mx.y - mn.y) * 0.22, sz = (mx.z - mn.z) * 0.22;
   let k = 0;
@@ -99,7 +101,7 @@ function setBrackets(l, b) {
   }
   l.geometry.attributes.position.needsUpdate = true;
 }
-function makeUSB() {
+export function makeUSB() {
   usbG = new T.Group(); usbG.visible = false; overlay.add(usbG);
   const metal = new T.MeshStandardMaterial({ color: C('#c9ced3'), metalness: 1, roughness: 0.25 });
   const mold = new T.MeshStandardMaterial({ color: C('#1c1f22'), roughness: 0.7 });
@@ -110,7 +112,7 @@ function makeUSB() {
   usbG.userData.pts = pts;
   for (let i = 0; i < 9; i++) { const s = glowSprite('#ffffff', 0.6); s.material.depthTest = false; s.renderOrder = 998; s.visible = false; overlay.add(s); flashDots.push(s); }
 }
-function makeRadioModel(parent) {
+export function makeRadioModel(parent) {
   const r = new T.Group(); parent.add(r);
   const body = new T.MeshStandardMaterial({ color: C('#2a2e33'), roughness: 0.55, metalness: 0.15 });
   const dark = new T.MeshStandardMaterial({ color: C('#16181b'), roughness: 0.7 });
@@ -129,7 +131,7 @@ function makeRadioModel(parent) {
   r.userData.tip = new T.Vector3(3.0 + Math.sin(0.35) * 1.45, 3.8 + Math.cos(0.35) * 1.45, -0.2);
   return r;
 }
-function makeGogglesModel(parent) {
+export function makeGogglesModel(parent) {
   const g = new T.Group(); parent.add(g);
   const body = new T.MeshStandardMaterial({ color: C('#25292e'), roughness: 0.5, metalness: 0.15 });
   const foam = new T.MeshStandardMaterial({ color: C('#121416'), roughness: 0.95 });
@@ -149,7 +151,7 @@ function makeGogglesModel(parent) {
   g.userData.ants.push(new T.Vector3(0, 3.0, 0.9));
   return g;
 }
-function makeRadio() {
+export function makeRadio() {
   radio = makeRadioModel(overlay); radio.visible = false;
   for (let i = 0; i < 18; i++) { const s = glowSprite('#ffffff', 0.7); s.material.depthTest = false; s.renderOrder = 997; s.visible = false; overlay.add(s); packets.push({ s, t: 0, on: false, dir: 1 }); }
   for (let i = 0; i < 3; i++) {
@@ -157,12 +159,12 @@ function makeRadio() {
     r.renderOrder = 996; r.visible = false; overlay.add(r); rings.push(r);
   }
 }
-function makeWheelbase() {
+export function makeWheelbase() {
   wbLine = new T.LineSegments(new T.BufferGeometry(), new T.LineBasicMaterial({ color: C(TC['--ink']), transparent: true, opacity: 0.45, toneMapped: false }));
   wbLine.geometry.setAttribute('position', new T.Float32BufferAttribute(new Float32Array(18), 3));
   scene.add(wbLine);
 }
-function updateWheelbase() {
+export function updateWheelbase() {
   const a = L.mp[3], b = L.mp[0], d = new T.Vector3().subVectors(b, a).normalize(), n = new T.Vector3(-d.z, 0, d.x).multiplyScalar(0.55 * kScale()), y = 0.03;
   const arr = wbLine.geometry.attributes.position.array;
   const P = [a.x, y, a.z, b.x, y, b.z, a.x + n.x, y, a.z + n.z, a.x - n.x, y, a.z - n.z, b.x + n.x, y, b.z + n.z, b.x - n.x, y, b.z - n.z];
@@ -174,7 +176,7 @@ function updateWheelbase() {
   e.pos = b.clone().addScaledVector(d, (L.propR || 6) + 1.0 * kScale()).setY(y);
   L.wb = mm;
 }
-function positionArrows() {
+export function positionArrows() {
   const s = (L.propR || 6.48) / 6.48;
   arrows.forEach((g, i) => {
     const p = L.mp[i];
@@ -184,7 +186,7 @@ function positionArrows() {
     g.userData.s = s;
   });
 }
-function updatePropHands() {
+export function updatePropHands() {
   const dirs = motorDirs(), pp = comps.props && comps.props.parts;
   dirs.forEach((d, i) => {
     if (pp && pp.hand && pp.hand[i]) pp.hand[i].scale.x = d < 0 ? -1 : 1;
@@ -201,7 +203,7 @@ function ghostIds() {
   if (S.ghost && S.sel) for (const id of ORDER) if (id !== S.sel) g.add(id);
   return g;
 }
-function applyLook() {
+export function applyLook() {
   if (!ok3d) return;
   const gs = ghostIds(), acc = C(TC['--accent']);
   const dim = S.mode === 'signals' ? 0.17 : 1;
@@ -222,13 +224,13 @@ function applyLook() {
     }
   }
 }
-function compBox(id) {
+export function compBox(id) {
   const c = comps[id], b = new T.Box3().setFromObject(c.g);
   if (b.isEmpty() && c.parts.anchor) { const k = kScale(); b.setFromCenterAndSize(c.parts.anchor.clone().add(c.g.position), new T.Vector3(1.9 * k, 0.9 * k, 1.9 * k)); }
   return b;
 }
 function anchorOf(id) { return compBox(id).getCenter(new T.Vector3()); }
-function calloutPos(id) {
+export function calloutPos(id) {
   const c = comps[id], pp = c.parts, k = kScale(), up = new T.Vector3(0, 0.9 * k, 0);
   let p;
   switch (id) {
@@ -249,41 +251,41 @@ function calloutPos(id) {
 }
 
 /* ---------- camera ---------- */
-function fitDist(r) {
+export function fitDist(r) {
   const vf = camera.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect);
   return r / Math.sin(Math.min(vf, hf) / 2);
 }
-function setView(target, yaw, pitch, dist) {
+export function setView(target, yaw, pitch, dist) {
   if (target) ctl.tTarget.copy(target);
   if (yaw != null) ctl.tYaw = ctl.yaw + wrapPi(yaw - ctl.yaw);
   if (pitch != null) ctl.tPitch = pitch;
   if (dist != null) ctl.tDist = dist;
 }
-function droneCenter() {
+export function droneCenter() {
   const b = new T.Box3();
   for (const id of ORDER) b.union(compBox(id));
   return b.isEmpty() ? new T.Vector3(0, 2, 0) : b.getCenter(new T.Vector3());
 }
-function homeView() { const c = droneCenter(); setView(new T.Vector3(0, c.y * 0.9, c.z * 0.3), 2.45, 0.44, fitDist(plat().fit)); }
-function focusComp(id, yaw, pitch) {
+export function homeView() { const c = droneCenter(); setView(new T.Vector3(0, c.y * 0.9, c.z * 0.3), 2.45, 0.44, fitDist(plat().fit)); }
+export function focusComp(id, yaw, pitch) {
   const b = compBox(id), sph = b.getBoundingSphere(new T.Sphere()), k = kScale();
   setView(sph.center, yaw, pitch, Math.min(110, Math.max(7.5 * k, fitDist(Math.max(1.8 * k, sph.radius) * 1.12))));
 }
 
 /* ---------- labels & peek ---------- */
-const LB = new Map();
-function label(key, html, cls) {
+export const LB = new Map();
+export function label(key, html, cls) {
   let e = LB.get(key);
   if (!e) { const el = document.createElement('div'); el.className = 'lbl'; labelsEl.appendChild(el); e = { el, pos: null, on: true, html: null, cls: null }; LB.set(key, e); }
   if (html != null && e.html !== html) { e.el.innerHTML = html; e.html = html; }
   if (cls != null && e.cls !== cls) { e.el.className = 'lbl ' + cls; e.cls = cls; }
   return e;
 }
-function toScreen(v) {
+export function toScreen(v) {
   const p = v.clone().project(camera);
   return { x: (p.x + 1) / 2 * stageEl.clientWidth, y: (1 - p.y) / 2 * stageEl.clientHeight, vis: p.z > -1 && p.z < 1 };
 }
-function updateLabels() {
+export function updateLabels() {
   for (const e of LB.values()) {
     if (!e.on || !e.pos) { if (e.shown !== false) { e.el.style.display = 'none'; e.shown = false; } continue; }
     const s = toScreen(typeof e.pos === 'function' ? e.pos() : e.pos);
@@ -294,7 +296,7 @@ function updateLabels() {
 }
 const peekEl = document.getElementById('peek'), leaderEl = document.getElementById('leader');
 const leadLine = document.getElementById('leadLine'), leadDot = document.getElementById('leadDot');
-function showPeek(id) {
+export function showPeek(id) {
   if (!id || S.mode !== 'build') { peekEl.classList.remove('show'); S.peekId = null; return; }
   if (S.peekId !== id || peekEl.dataset.v !== String(S.ver)) {
     const d = COMP[id];
@@ -307,7 +309,7 @@ function showPeek(id) {
   }
   S.peekId = id; peekEl.classList.add('show');
 }
-function updateLeader() {
+export function updateLeader() {
   if (!S.peekId || !peekEl.classList.contains('show')) { leaderEl.classList.add('off'); return; }
   const a = toScreen(anchorOf(S.peekId));
   if (!a.vis) { leaderEl.classList.add('off'); return; }
@@ -322,13 +324,13 @@ function updateLeader() {
 }
 
 /* ---------- selection ---------- */
-function setHover(id) {
+export function setHover(id) {
   if (S.hover === id) return;
   S.hover = id; applyLook(); showPeek(id || S.sel);
   canvas.classList.toggle('hovering', !!id);
   onHoverUI(id);
 }
-function select(id, o = {}) {
+export function select(id, o = {}) {
   if (!id) { clearSel(); return; }
   S.sel = id; S.ghost = o.ghost !== false;
   if (o.focus !== false && ok3d) focusComp(id, o.yaw, o.pitch);
@@ -337,11 +339,11 @@ function select(id, o = {}) {
   updateSpinBtn();
   applyLook(); showPeek(S.hover || id); onSelectUI(id);
 }
-function clearSel() { S.sel = null; S.ghost = false; applyLook(); showPeek(S.hover); onSelectUI(null); }
+export function clearSel() { S.sel = null; S.ghost = false; applyLook(); showPeek(S.hover); onSelectUI(null); }
 
 /* ---------- tour ---------- */
 const BURIED = ['esc', 'fc', 'rx', 'vtx', 'power'];
-function tourGo(i) {
+export function tourGo(i) {
   S.tourI = (i + ORDER.length) % ORDER.length; S.tourT = 0;
   const id = ORDER[S.tourI];
   stopDemos();
@@ -349,10 +351,10 @@ function tourGo(i) {
   focusComp(id); applyLook(); showPeek(id); onSelectUI(id);
   document.getElementById('tourPos').textContent = `${S.tourI + 1} / ${ORDER.length}`;
 }
-function startTour() { S.tour = true; document.getElementById('tourBar').hidden = false; document.getElementById('tTour').setAttribute('aria-pressed', 'true'); ctl.auto = false; updateSpinBtn(); tourGo(S.sel ? ORDER.indexOf(S.sel) : 0); }
-function stopTour() {
+export function startTour() { S.tour = true; document.getElementById('tourBar').hidden = false; document.getElementById('tTour').setAttribute('aria-pressed', 'true'); ctl.auto = false; updateSpinBtn(); tourGo(S.sel ? ORDER.indexOf(S.sel) : 0); }
+export function stopTour() {
   if (!S.tour) return;
   S.tour = false; document.getElementById('tourBar').hidden = true; document.getElementById('tTour').setAttribute('aria-pressed', 'false');
 }
-function tickTour(dt) { if (!S.tour || S.drawerOpen) return; S.tourT += dt; if (S.tourT > 5.5) tourGo(S.tourI + 1); }
-function updateSpinBtn() { if (ctl) document.getElementById('tSpin').setAttribute('aria-pressed', String(!!ctl.auto)); }
+export function tickTour(dt) { if (!S.tour || S.drawerOpen) return; S.tourT += dt; if (S.tourT > 5.5) tourGo(S.tourI + 1); }
+export function updateSpinBtn() { if (ctl) document.getElementById('tSpin').setAttribute('aria-pressed', String(!!ctl.auto)); }

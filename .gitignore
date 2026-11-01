@@ -1,4 +1,6 @@
 node_modules/
+dist/
+dist-single/
 tests/shots/
 .DS_Store
 Thumbs.db

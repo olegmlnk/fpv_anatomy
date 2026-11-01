@@ -1,9 +1,14 @@
 /* Курс по БПЛА · розділ «Гайди»: покрокове налаштування польотника (Betaflight), пульта (EdgeTX) і радіолінії
  * ExpressLRS. Загальновідомий порядок без прив’язки до конкретної плати чи цілі прошивки. 3D-сцена показує вузол
- * або орган керування, про який іде мова на кроці.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content → options → core → builders → whoop → anim → demos → signals → antlab → radio → guides → ui */
-'use strict';
+ * або орган керування, про який іде мова на кроці. */
+import * as T from 'three';
+import { narrowMQ, ok3d, reduceMotion, root, stageEl } from '../engine/core.js';
+import { applyLook, fitDist, focusComp, homeView, LB, S, setView, updateSpinBtn, wbLine } from '../engine/anim.js';
+import { ctl, matMesh, shadowMesh } from '../engine/demos.js';
+import { clamp, pressSeg } from './antlab.js';
+import { RAD, radG, radPilotAim, radScenario, radScreen, radStep, radTX, radVisual, RP } from './radio.js';
+import { $, goMode, setText } from '../ui/ui.js';
+
 /* сцена кроку: drone — модель дрона з фокусом на вузлі; radio — пульт крупно з підсвіченим органом; link — пульт і дрон */
 const GUIDES = {
   bf: {
@@ -244,7 +249,7 @@ function gdLoad() { try { GD.done = JSON.parse(localStorage.getItem('fpvGuideDon
 function gdSave() { try { localStorage.setItem('fpvGuideDone', JSON.stringify(GD.done)); } catch (e) { /* сховище недоступне */ } }
 
 /* ---------- 3D-сцена кроку ---------- */
-function gdScene(reframe) {
+export function gdScene(reframe) {
   if (!ok3d || S.mode !== 'guides') return;
   const sc = gdStep().scene || { k: 'drone', f: 'fc' }, drone = sc.k === 'drone', rad = !drone;
   root.visible = matMesh.visible = shadowMesh.visible = drone; wbLine.visible = false;
@@ -258,12 +263,12 @@ function gdScene(reframe) {
   else if (sc.k === 'radio') { RAD.view = 'guide'; setView(new T.Vector3(0, 14.9, -0.5), 0, 0.6, fitDist(14.2)); }
   else { RAD.view = 'pilot'; radPilotAim(); }
 }
-function guideEnter() { RAD.tipT = 0; RAD.hover = null; gdScene(true); gdMark(); }
-function guideExit() {
+export function guideEnter() { RAD.tipT = 0; RAD.hover = null; gdScene(true); gdMark(); }
+export function guideExit() {
   RAD.hl = null; RAD.hlT = 0;
   for (const [k, e] of LB) if (k.startsWith('rad')) e.on = false;
 }
-function tickGuide(dt, now) {
+export function tickGuide(dt, now) {
   if (!radG || !radG.visible) return;
   radStep(dt); radVisual(dt, now);
   RAD.scrT += dt; if (RAD.scrT > 0.12) { RAD.scrT = 0; radScreen(); }
@@ -311,7 +316,7 @@ function gdGo(i, scroll) {
   if (scroll) { const li = document.querySelector(`#gdSteps > li[data-i="${GD.i}"]`); if (li && li.getBoundingClientRect().top < (narrowMQ.matches ? stageEl.getBoundingClientRect().bottom : 0)) li.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }); }
 }
 function gdSetGuide(g) { if (!GUIDES[g]) return; GD.g = g; GD.i = 0; gdRender(); gdScene(true); }
-function gdUIInit() {
+export function gdUIInit() {
   if (!$('gdPanel')) return;
   gdLoad();
   $('gdTabs').innerHTML = Object.entries(GUIDES).map(([id, g]) => `<button type="button" data-gd="${id}">${g.name}</button>`).join('');

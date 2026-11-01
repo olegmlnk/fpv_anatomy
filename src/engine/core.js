@@ -1,15 +1,15 @@
-/* Курс по БПЛА · рендерер, текстури, геометричні хелпери, розкладка платформ.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
-'use strict';
+/* Курс по БПЛА · рендерер, текстури, геометричні хелпери, розкладка платформ. */
+import * as T from 'three';
+import { battDims, cfg, opt, plat } from '../data/options.js';
+
 /* ================= 3D SCENE ================= */
-const T = window.THREE;
-const stageEl = document.getElementById('stage');
-const canvas = document.getElementById('gl');
-const labelsEl = document.getElementById('labels');
-let ok3d = false, renderer = null, scene, camera, root, overlay;
+export const stageEl = document.getElementById('stage');
+export const canvas = document.getElementById('gl');
+export const labelsEl = document.getElementById('labels');
+export const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+export const narrowMQ = window.matchMedia('(max-width: 900px)');
+export let ok3d = false, renderer = null, scene, camera, root, overlay;
 try {
-  if (!T) throw new Error('three.js не завантажився');
   renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: true });
   ok3d = true;
 } catch (err) {
@@ -18,21 +18,30 @@ try {
   document.getElementById('hint').hidden = true;
 }
 
-const UP = ok3d ? new T.Vector3(0, 1, 0) : null;
-const C = h => new T.Color(h).convertSRGBToLinear();
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const v3 = p => (p.isVector3 ? p.clone() : new T.Vector3(p[0], p[1], p[2]));
-const TEX = {};
-const comps = {};
-const L = { mp: [], seatY: 2.1 };
-const TC = {};
+/* граф сцени створює initSceneGraph(); ok3d змінюється лише через setOk3d() */
+export function initSceneGraph() {
+  scene = new T.Scene();
+  camera = new T.PerspectiveCamera(34, 1, 0.1, 900);
+  root = new T.Group(); scene.add(root);
+  overlay = new T.Group(); scene.add(overlay);
+}
+export function setOk3d(v) { ok3d = v; }
 
-function readTheme() {
+export const UP = ok3d ? new T.Vector3(0, 1, 0) : null;
+export const C = h => new T.Color(h).convertSRGBToLinear();
+export const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+export const v3 = p => (p.isVector3 ? p.clone() : new T.Vector3(p[0], p[1], p[2]));
+export const TEX = {};
+export const comps = {};
+export const L = { mp: [], seatY: 2.1 };
+export const TC = {};
+
+export function readTheme() {
   ['--accent', '--cw', '--ccw', '--sig-power', '--sig-ctrl', '--sig-motor', '--sig-video', '--led', '--ink', '--ok', '--warn', '--bad'].forEach(k => { TC[k] = css(k) || '#888888'; });
 }
 
 /* ---------- textures ---------- */
-function canvasTex(w, h, draw, srgb = true) {
+export function canvasTex(w, h, draw, srgb = true) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
   const t = new T.CanvasTexture(c);
@@ -40,7 +49,7 @@ function canvasTex(w, h, draw, srgb = true) {
   t.anisotropy = 4;
   return t;
 }
-function makeTextures() {
+export function makeTextures() {
   TEX.carbon = canvasTex(128, 128, (x, w) => {
     x.fillStyle = '#141618'; x.fillRect(0, 0, w, w);
     const n = 8, s = w / n;
@@ -71,7 +80,7 @@ function makeTextures() {
     x.fillStyle = g; x.fillRect(0, 0, w, w);
   });
 }
-function textTex(lines, o) {
+export function textTex(lines, o) {
   return canvasTex(o.w || 256, o.h || 256, (x, w, h) => {
     if (o.bg) { x.fillStyle = o.bg; x.fillRect(0, 0, w, h); }
     if (o.pre) o.pre(x, w, h);
@@ -85,11 +94,11 @@ function textTex(lines, o) {
 }
 
 /* ---------- registry & geometry helpers ---------- */
-function compInit(id, ex) {
+export function compInit(id, ex) {
   const g = new T.Group(); g.name = id; root.add(g);
   comps[id] = { id, g, mats: [], meshes: [], tex: [], parts: {}, ex: new T.Vector3(ex[0], ex[1], ex[2]) };
 }
-function mk(cid, p) {
+export function mk(cid, p) {
   const m = new T.MeshStandardMaterial({
     color: C(p.c || '#ffffff'), roughness: p.r ?? 0.55, metalness: p.m ?? 0, map: p.map || null, side: p.side || T.FrontSide
   });
@@ -100,7 +109,7 @@ function mk(cid, p) {
   comps[cid].mats.push(m);
   return m;
 }
-function add(cid, geo, mat, pos, rot, parent, wire) {
+export function add(cid, geo, mat, pos, rot, parent, wire) {
   const me = new T.Mesh(geo, mat);
   if (pos) { if (pos.isVector3) me.position.copy(pos); else me.position.set(pos[0], pos[1], pos[2]); }
   if (rot) me.rotation.set(rot[0], rot[1], rot[2]);
@@ -110,15 +119,15 @@ function add(cid, geo, mat, pos, rot, parent, wire) {
   comps[cid].meshes.push(me);
   return me;
 }
-function clearComp(cid) {
+export function clearComp(cid) {
   const c = comps[cid];
   c.g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.isSprite && o.material) o.material.dispose(); });
   c.mats.forEach(m => m.dispose()); c.tex.forEach(t => t.dispose());
   c.g.clear(); c.mats = []; c.meshes = []; c.tex = []; c.parts = {};
 }
-const box = (w, h, d) => new T.BoxGeometry(w, h, d);
-const cyl = (rt, rb, h, seg = 24, open = false) => new T.CylinderGeometry(rt, rb, h, seg, 1, open);
-function rrect(w, l, r, cx = 0, cy = 0, path = false) {
+export const box = (w, h, d) => new T.BoxGeometry(w, h, d);
+export const cyl = (rt, rb, h, seg = 24, open = false) => new T.CylinderGeometry(rt, rb, h, seg, 1, open);
+export function rrect(w, l, r, cx = 0, cy = 0, path = false) {
   const s = path ? new T.Path() : new T.Shape();
   const x0 = cx - w / 2, y0 = cy - l / 2;
   s.moveTo(x0 + r, y0); s.lineTo(x0 + w - r, y0); s.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + r);
@@ -127,27 +136,27 @@ function rrect(w, l, r, cx = 0, cy = 0, path = false) {
   s.lineTo(x0, y0 + r); s.quadraticCurveTo(x0, y0, x0 + r, y0);
   return s;
 }
-function capsule(len, w) {
+export function capsule(len, w) {
   const r = w / 2, s = new T.Shape();
   s.moveTo(0, -r); s.lineTo(len, -r); s.absarc(len, 0, r, -Math.PI / 2, Math.PI / 2, false);
   s.lineTo(0, r); s.absarc(0, 0, r, Math.PI / 2, Math.PI * 1.5, false);
   return s;
 }
-function slab(shape, depth, bevel = 0.02) {
+export function slab(shape, depth, bevel = 0.02) {
   const g = new T.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1, curveSegments: 10 });
   g.rotateX(-Math.PI / 2);
   return g;
 }
-function alignTo(obj, from, dir, len) {
+export function alignTo(obj, from, dir, len) {
   const d = dir.clone().normalize();
   obj.position.copy(from).addScaledVector(d, len / 2);
   obj.quaternion.setFromUnitVectors(UP, d);
 }
-function tube(cid, pts, r, mat, wire = true, seg) {
+export function tube(cid, pts, r, mat, wire = true, seg) {
   const curve = new T.CatmullRomCurve3(pts.map(v3));
   return add(cid, new T.TubeGeometry(curve, seg || Math.max(24, pts.length * 12), r, 7, false), mat, null, null, null, wire);
 }
-function glowSprite(color, size) {
+export function glowSprite(color, size) {
   const s = new T.Sprite(new T.SpriteMaterial({ map: TEX.glow, color: new T.Color(color), transparent: true, depthWrite: false, toneMapped: false }));
   s.scale.set(size, size, size);
   return s;
@@ -161,9 +170,9 @@ const LAYOUT = {
   hex: { body: [7.0, 12.0], arm: [1.6, 0.6], pad: 1.85, top: [6.4, 11.4, -0.4], stand: [[2.6, -3.6], [-2.6, -3.6], [2.6, 4.8], [-2.6, 4.8]], camZ: -4.8, battZc: -2.6, rearMount: true, xtX: -2.4 },
   whoop: { micro: true, duct: 2.3, ductY: [0.72, 2.1], motorY: 1.05, plateY: 1.2, plateT: 0.14, board: 2.7, boardY: 1.5, camZ: -1.3 }
 };
-const LAY = () => LAYOUT[cfg.platform];
+export const LAY = () => LAYOUT[cfg.platform];
 
-function computeLayout() {
+export function computeLayout() {
   let p;
   switch (cfg.frame) {
     case 'squashed': p = [[8.9, 6.9], [8.9, -6.9], [-8.9, 6.9], [-8.9, -6.9]]; break;
@@ -177,16 +186,16 @@ function computeLayout() {
   }
   L.mp = p.map(([x, z]) => new T.Vector3(x, 0, z));
 }
-function armStart(p) {
+export function armStart(p) {
   if (cfg.platform === 'hex') return new T.Vector2(p.x, p.z).normalize().multiplyScalar(2.6);
   if (plat().micro) return new T.Vector2(Math.sign(p.x) * 0.9, Math.sign(p.z) * 0.9);
   return new T.Vector2(Math.sign(p.x) * LAY().body[0] * 0.25, p.z * 0.32);
 }
 /* розміщення батареї та залежних від неї вузлів */
-function battPos() {
+export function battPos() {
   const b = opt('battery'), [W, H, Lz] = battDims(b), lay = LAY();
   if (lay.micro) return { W, H, Lz, zc: 0.15, rear: 0.15 + Lz / 2, front: 0.15 - Lz / 2, top: H, bottom: 0 };
   const zc = lay.battZc == null ? 3.45 - Lz / 2 : lay.battZc;
   return { W, H, Lz, zc, rear: zc + Lz / 2, front: zc - Lz / 2, top: 3.47 + H };
 }
-function bodyRear() { const lay = LAY(); return lay.micro ? 1.6 : lay.body[1] / 2; }
+export function bodyRear() { const lay = LAY(); return lay.micro ? 1.6 : lay.body[1] / 2; }

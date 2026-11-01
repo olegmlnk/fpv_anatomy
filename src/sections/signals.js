@@ -1,9 +1,13 @@
-/* Курс по БПЛА · режим «Сигнали»: покрокові ланцюжки керування, живлення, відео, телеметрії.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
-'use strict';
+/* Курс по БПЛА · режим «Сигнали»: покрокові ланцюжки керування, живлення, відео, телеметрії. */
+import * as T from 'three';
+import { calc, camOpt, cfg, fmt, fmtA, opt, plat } from '../data/options.js';
+import { C, comps, glowSprite, L, ok3d, reduceMotion, root, scene, TC, UP } from '../engine/core.js';
+import { droneCenter, fitDist, kScale, label, LB, makeGogglesModel, makeRadioModel, S, setView, toScreen, updateSpinBtn } from '../engine/anim.js';
+import { ctl, setStatus } from '../engine/demos.js';
+import { openDrawer, setOpt } from '../ui/ui.js';
+
 /* ================= SIGNALS: step-by-step chains ================= */
-const SIG = { chain: 'ctrl', step: 0, t: 0, playing: !reduceMotion, hops: [], dur: 3.4, hold: 2.2 };
+export const SIG = { chain: 'ctrl', step: 0, t: 0, playing: !reduceMotion, hops: [], dur: 3.4, hold: 2.2 };
 const CHAINS = [
   { id: 'ctrl', name: 'Керування', color: '--sig-ctrl', ink: 'var(--on-sig)', intro: 'Від стіка пульта до тяги пропелерів: як команда проходить через приймач, польотник і ESC.' },
   { id: 'power', name: 'Живлення', color: '--sig-power', ink: 'var(--on-sig)', intro: 'Як енергія батареї розходиться дроном: силова частина й стабілізатори напруги для електроніки.' },
@@ -13,19 +17,19 @@ const CHAINS = [
 const chainMeta = id => CHAINS.find(c => c.id === id);
 let sigGroup = null, sigLines, sigRadio, sigGog, sigPk = [];
 
-function sigInit() {
+export function sigInit() {
   sigGroup = new T.Group(); sigGroup.visible = false; scene.add(sigGroup);
   sigLines = new T.Group(); sigGroup.add(sigLines);
   sigRadio = makeRadioModel(sigGroup); sigGog = makeGogglesModel(sigGroup);
   for (let i = 0; i < 27; i++) { const s = glowSprite('#ffffff', 0.7); s.material.depthTest = false; s.renderOrder = 997; s.visible = false; sigGroup.add(s); sigPk.push(s); }
 }
-function sigEnter() { if (!sigGroup) return; sigGroup.visible = true; ctl.auto = false; updateSpinBtn(); SIG.t = 0; sigRebuild(true); }
-function sigExit() {
+export function sigEnter() { if (!sigGroup) return; sigGroup.visible = true; ctl.auto = false; updateSpinBtn(); SIG.t = 0; sigRebuild(true); }
+export function sigExit() {
   if (sigGroup) sigGroup.visible = false;
   setStatus(null);
   for (const [k, e] of LB) if (k.startsWith('sig')) e.on = false;
 }
-function sigTheme() { if (S.mode === 'signals') sigRebuild(false); }
+export function sigTheme() { if (S.mode === 'signals') sigRebuild(false); }
 
 /* ---------- geometry (лише коли є 3D) ---------- */
 function arc(a, b, lift) {
@@ -236,7 +240,7 @@ function sigClear() {
   sigLines.children.slice().forEach(o => { sigLines.remove(o); if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
   for (const [k, e] of LB) if (k.startsWith('sig')) e.on = false;
 }
-function sigRebuild(reframe) {
+export function sigRebuild(reframe) {
   SIG.hops = chainHops(SIG.chain);
   if (SIG.step >= SIG.hops.length) SIG.step = 0;
   SIG.t = 0;
@@ -280,7 +284,7 @@ function sigSetChain(id) { SIG.chain = id; SIG.step = 0; SIG.t = 0; SIG.playing 
 function sigGo(i) { SIG.step = Math.max(0, Math.min(SIG.hops.length - 1, i)); SIG.t = 0; markSigSteps(); }
 function sigToggle() { SIG.playing = !SIG.playing; if (SIG.playing && SIG.step >= SIG.hops.length - 1) SIG.step = 0; SIG.t = 0; markSigSteps(); }
 const midOf = h => (h.curves.length ? h.curves[0].getPointAt(0.5) : h.node);
-function tickSig(dt, now) {
+export function tickSig(dt, now) {
   const n = SIG.hops.length; if (!n || !SIG.hops[0].mat) return;
   if (SIG.playing) {
     SIG.t += dt;
@@ -356,7 +360,7 @@ function markSigSteps() {
   const pos = document.getElementById('sigPos'); if (pos) pos.textContent = `${SIG.step + 1} / ${SIG.hops.length}`;
   const pl = document.getElementById('sigPlay'); if (pl) { pl.textContent = SIG.playing ? 'Пауза' : 'Відтворити'; pl.setAttribute('aria-pressed', String(SIG.playing)); }
 }
-function sigUIInit() {
+export function sigUIInit() {
   const panel = document.getElementById('sigPanel');
   document.getElementById('sigTabs').innerHTML = CHAINS.map(c => `<button type="button" data-chain="${c.id}" style="--cc: var(${c.color}); --cci: ${c.ink}" aria-pressed="false"><i></i>${c.name}</button>`).join('');
   panel.addEventListener('click', e => {

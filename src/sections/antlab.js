@@ -1,7 +1,12 @@
-/* Курс по БПЛА · режим «Антени»: стенд «виносна станція ↔ дрон», бюджет радіолінії.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content → options → core → builders → whoop → anim → demos → signals → antlab → relay → radio → guides → ui */
-'use strict';
+/* Курс по БПЛА · режим «Антени»: стенд «виносна станція ↔ дрон», бюджет радіолінії. */
+import * as T from 'three';
+import { fmt, opt } from '../data/options.js';
+import { alignTo, box, C, css, cyl, ok3d, reduceMotion, scene, TC, UP, v3 } from '../engine/core.js';
+import { fitDist, label, LB, S, setView, updateSpinBtn } from '../engine/anim.js';
+import { ctl, setMode } from '../engine/demos.js';
+import { relEnter, relExit, relFrame, relInit, relSetSub, relTheme, relUIInit, tickRel } from './relay.js';
+import { $, closeDrawer, setHTML, setText } from '../ui/ui.js';
+
 /* ================= ANTENNA LAB: виносна станція ↔ дрон ================= */
 const DEG = Math.PI / 180;
 const VA = {
@@ -15,11 +20,11 @@ const VA = {
   perp: (a, d) => { const k = a[0] * d[0] + a[1] * d[1] + a[2] * d[2]; return [a[0] - d[0] * k, a[1] - d[1] * k, a[2] - d[2] * k]; },
   at: (o, F, p) => [o[0] + F.X[0] * p[0] + F.Y[0] * p[1] + F.Z[0] * p[2], o[1] + F.X[1] * p[0] + F.Y[1] * p[1] + F.Z[1] * p[2], o[2] + F.X[2] * p[0] + F.Y[2] * p[1] + F.Z[2] * p[2]]
 };
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const dbm = mw => 10 * Math.log10(mw);
-const fmt1 = v => fmt(v, 1);
-const sgn1 = v => (v >= 0 ? '+' : '−') + fmt(Math.abs(v), 1);
-const fmtKm = km => (km < 1 ? `${fmt(Math.round(km * 1000 / 10) * 10)} м` : km < 10 ? `${fmt(km, 1)} км` : `${fmt(km)} км`);
+export const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+export const dbm = mw => 10 * Math.log10(mw);
+export const fmt1 = v => fmt(v, 1);
+export const sgn1 = v => (v >= 0 ? '+' : '−') + fmt(Math.abs(v), 1);
+export const fmtKm = km => (km < 1 ? `${fmt(Math.round(km * 1000 / 10) * 10)} м` : km < 10 ? `${fmt(km, 1)} км` : `${fmt(km)} км`);
 const wrap180 = a => ((a + 180) % 360 + 360) % 360 - 180;
 
 /* ---------- каталог: G — максимальне підсилення, дБі; bw — ширина променя −3 дБ; fb — фронт/тил ---------- */
@@ -40,7 +45,7 @@ const ANT = {
   yagi9: { name: 'Yagi 900', band: '9', kind: 'dir', pol: 'lin', g: 10, bw: 50, fb: 18, model: 'yagi', sides: 's' }
 };
 const BANDS = { 58: '5,8 ГГц', 24: '2,4 ГГц', 9: '868/915 МГц' };
-const LCH = {
+export const LCH = {
   video: { name: 'Відео 5,8 ГГц', band: '58', f: 5800, tx: 'dr', pw: [25, 200, 600, 1000], pw0: 600, sens: -90, color: '--sig-video', st: 'patch58', dr: 'lolli58' },
   e24: { name: 'ELRS 2,4 ГГц', band: '24', f: 2440, tx: 'st', pw: [25, 100, 250, 500, 1000], pw0: 250, rates: [[50, -115], [150, -112], [250, -108], [500, -105]], color: '--sig-ctrl', st: 'dip24', dr: 'dip24' },
   e9: { name: 'ELRS 900 МГц', band: '9', f: 900, tx: 'st', pw: [25, 100, 250, 500, 1000], pw0: 250, rates: [[25, -123], [50, -120], [100, -117], [200, -112]], color: '--sig-ctrl', st: 'dip9', dr: 'imt9' }
@@ -48,7 +53,7 @@ const LCH = {
 /* фазовий центр моделі в локальних координатах антени (до масштабу сторони) */
 const MODEL_PC = { lolli: [0, 1.75, 0], pagoda: [0, 1.5, 0], stubby: [0, 0.55, 0], dipole: [0, 1.6, 0], tant: [0, 1.3, 0.5], ceramic: [0, 0.3, 0.15], patch: [0, 0, 0.4], helix: [0, 0, 1.2], moxon: [0, 0, 0.25], yagi: [0, 0, 0.4] };
 const SIDE_S = { st: 1.25, dr: 0.8 };
-const LAB = {
+export const LAB = {
   ch: 'video',
   sel: { video: { st: 'patch58', sh: 1, dr: 'lolli58', dh: 1 }, e24: { st: 'dip24', sh: 1, dr: 'dip24', dh: 1 }, e9: { st: 'dip9', sh: 1, dr: 'imt9', dh: 1 } },
   pw: { video: 600, e24: 250, e9: 250 }, rate: { e24: 250, e9: 100 },
@@ -92,7 +97,7 @@ function polar(tx, rx, d) {
   const cs = Math.abs(VA.dot(VA.norm(p1), VA.norm(p2))), ang = Math.acos(clamp(cs, 0, 1)) / DEG;
   return { db: Math.min(25, -20 * Math.log10(Math.max(cs, 1e-4))), kind: 'lin', ang, txt: `лінійна → лінійна, ${Math.round(ang)}°` };
 }
-function labSolve() {
+export function labSolve() {
   const c = LCH[LAB.ch], s = LAB.sel[LAB.ch], sa = ANT[s.st], da = ANT[s.dr];
   const head = [0, 6.2, 0], d = LAB.dist, hRel = LAB.alt - 5;
   const dSl = Math.max(0.005, Math.hypot(d * 1000, hRel) / 1000);
@@ -178,11 +183,11 @@ function labFixText(r) {
 }
 
 /* ---------- 3D ---------- */
-let labG = null, labGroundTex, stAntG, drG, drAntG, linkM, reflM = [], labArr = [], labTip = [], ringSets = [], glyph = {}, labArrMat, labLinkMat, labReflMat;
+export let labG = null, labGroundTex, stAntG, drG, drAntG, linkM, reflM = [], labArr = [], labTip = [], ringSets = [], glyph = {}, labArrMat, labLinkMat, labReflMat;
 const RING_N = 160, NARR = 30;
 const WAVE_VS = 'attribute float side; attribute float g; uniform float uR; uniform float uTh; varying float vG; void main(){ vG = g; vec3 p = position * (uR + side * uTh); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }';
 const WAVE_FS = 'uniform vec3 uC; uniform float uOp; varying float vG; void main(){ gl_FragColor = vec4(uC, uOp * vG); }';
-const LM = {};
+export const LM = {};
 function labMats() {
   LM.black = new T.MeshStandardMaterial({ color: C('#1c1f22'), roughness: 0.6 });
   LM.red = new T.MeshStandardMaterial({ color: C('#C8392C'), roughness: 0.4 });
@@ -211,13 +216,13 @@ function drawLabGround() {
   x.globalCompositeOperation = 'source-over';
   labGroundTex.needsUpdate = true;
 }
-function mesh(parent, geo, mat, p, r) {
+export function mesh(parent, geo, mat, p, r) {
   const m = new T.Mesh(geo, mat);
   if (p) m.position.set(p[0], p[1], p[2]);
   if (r) m.rotation.set(r[0], r[1], r[2]);
   parent.add(m); return m;
 }
-function rod(parent, a, b, r, mat, seg = 8) {
+export function rod(parent, a, b, r, mat, seg = 8) {
   const A = v3(a), B = v3(b), d = B.clone().sub(A), len = d.length();
   const m = new T.Mesh(cyl(r, r, len, seg), mat); alignTo(m, A, d, len); parent.add(m); return m;
 }
@@ -369,7 +374,7 @@ function makeGlyph() {
   g.add(circ, lin); g.userData = { circ, lin, mat }; g.renderOrder = 8; labG.add(g);
   return g;
 }
-function labInit() {
+export function labInit() {
   labMats();
   labG = new T.Group(); labG.visible = false; scene.add(labG);
   labGroundTex = new T.CanvasTexture(document.createElement('canvas')); labGroundTex.encoding = T.sRGBEncoding; labGroundTex.anisotropy = 8;
@@ -402,20 +407,20 @@ function labInit() {
   glyph.tx = makeGlyph(); glyph.rx = makeGlyph();
   relInit();
 }
-function labEnter() {
+export function labEnter() {
   if (!labG) return;
   if (LAB.sub === 'relay') { relEnter(); return; }
   labG.visible = true; ctl.auto = false; updateSpinBtn();
   labSetAnts(); LAB.res = labSolve(); labApply(LAB.res); labReadout(LAB.res);
   labFrame(LAB.orbit ? 'orbit' : 'link');
 }
-function labExit() {
+export function labExit() {
   if (labG) labG.visible = false;
   relExit();
   if (LAB.orbit || LAB.rock) { LAB.orbit = false; LAB.rock = false; labRenderControls(); }
   for (const [k, e] of LB) if (k.startsWith('lab')) e.on = false;
 }
-function labTheme() {
+export function labTheme() {
   if (!labG) return;
   drawLabGround(); relTheme();
   [stAntG, drAntG].forEach(G => { const w = G.userData.pat && G.userData.pat.userData.wire; if (w) w.material.color.copy(C(TC['--ink'])); });
@@ -424,7 +429,7 @@ function labTheme() {
 function basisQ(q, F) { q.setFromRotationMatrix(new T.Matrix4().makeBasis(v3(F.X), v3(F.Y), v3(F.Z))); }
 function placeRod(m, a, b) { const d = b.clone().sub(a), len = d.length(); m.position.copy(a).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(UP, d.normalize()); m.scale.set(1, len, 1); }
 function labSource(r) { const side = LAB.src === 'tx' ? r.tx.side : LAB.src; return side === r.tx.side ? r.tx : r.rx; }
-function labApply(r) {
+export function labApply(r) {
   if (!ok3d || !labG) return;
   const v = LAB.vcls = labVerdict(r).cls, tp = v3(r.tx.p), rp = v3(r.rx.p), d = rp.clone().sub(tp).normalize();
   drG.position.set(r.dPos[0], r.dPos[1], r.dPos[2]); basisQ(drG.quaternion, r.dr); basisQ(stAntG.quaternion, r.st);
@@ -494,7 +499,7 @@ function labAnimate(r, now) {
     G.quaternion.copy(G.userData.base).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), now * 2.2));
   });
 }
-function tickLab(dt, now) {
+export function tickLab(dt, now) {
   if (!labG) return;
   if (LAB.sub === 'relay') { tickRel(dt, now); return; }
   LAB.t += reduceMotion ? 0 : dt;
@@ -506,7 +511,7 @@ function tickLab(dt, now) {
   }
   labAnimate(LAB.res, now);
 }
-function labFrame(kind) {
+export function labFrame(kind) {
   if (!ok3d || !labG) return;
   if (LAB.sub === 'relay') { relFrame(); return; }
   const r = LAB.res || labSolve(), A = v3(r.head), B = v3(r.dPos);
@@ -527,7 +532,7 @@ function labOptions(side) {
     `<optgroup label="${BANDS[b]}">` + Object.entries(ANT).filter(([, a]) => a.band === b && a.sides.includes(side === 'st' ? 's' : 'd'))
       .map(([id, a]) => `<option value="${id}">${a.name}${a.kind === 'dir' ? ` · ${fmt1(a.g)} дБі, ${a.bw}°` : ''}</option>`).join('') + '</optgroup>').join('');
 }
-function pressSeg(el, key, val) { el.querySelectorAll(`[data-${key}]`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset[key] === String(val)))); }
+export function pressSeg(el, key, val) { el.querySelectorAll(`[data-${key}]`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset[key] === String(val)))); }
 function labSyncSliders() {
   const set = (id, v, out) => { const el = document.getElementById(id); if (el && +el.value !== v) el.value = v; setText(document.getElementById(id + 'Out'), out); };
   set('labDist', distToX(LAB.dist), fmtKm(LAB.dist));
@@ -535,7 +540,7 @@ function labSyncSliders() {
   set('labAz', Math.round(LAB.az), `${Math.round(LAB.az)}°`);
   set('labRoll', LAB.roll, `${LAB.roll}°`);
 }
-function labRenderControls() {
+export function labRenderControls() {
   const c = LCH[LAB.ch], s = LAB.sel[LAB.ch], sa = ANT[s.st], da = ANT[s.dr];
   pressSeg($('labCh'), 'ch', LAB.ch);
   pressSeg($('labScen'), 'scen', LAB.scen || '');
@@ -564,7 +569,7 @@ function labRenderControls() {
   pressSeg($('labSrc'), 'src', LAB.src === 'tx' ? c.tx : LAB.src);
   ['labShow', 'labSrc', 'labOrbit', 'labRock'].forEach(id => $(id).toggleAttribute('data-off', !ok3d));
 }
-function labReadout(r) {
+export function labReadout(r) {
   const v = labVerdict(r), rows = [
     ['Передавач', `${r.pw >= 1000 ? fmt(r.pw / 1000) + ' Вт' : r.pw + ' мВт'} = ${fmt1(r.ptx)} дБм`],
     [`Антена передавача (${r.tx.side === 'st' ? 'станція' : 'дрон'})`, `${r.tx.a.name} · ${sgn1(r.gT)} дБі`],
@@ -613,7 +618,7 @@ function labFocus(side) {
   if (ok3d && S.mode === 'antennas') { LAB.res = labSolve(); labApply(LAB.res); labFrame(side); }
 }
 /* відкрити стенд з антеною, що стоїть на дроні в конфігураторі */
-function labOpenFrom(kind) {
+export function labOpenFrom(kind) {
   if (LAB.sub !== 'lab') relSetSub('lab');
   if (kind === 'vtx') { LAB.ch = 'video'; LAB.sel.video.dr = opt('vtxant').lab || 'lolli58'; }
   else {
@@ -627,7 +632,7 @@ function labOpenFrom(kind) {
   labChanged();
   if (ok3d) { LAB.res = labSolve(); labApply(LAB.res); labFrame('dr'); }
 }
-function labUIInit() {
+export function labUIInit() {
   $('labCh').innerHTML = Object.entries(LCH).map(([id, c]) => `<button type="button" data-ch="${id}">${c.name}</button>`).join('');
   $('labScen').innerHTML = SCEN.map(s => `<button type="button" data-scen="${s.id}">${s.name}</button>`).join('');
   $('antPanel').addEventListener('click', e => {

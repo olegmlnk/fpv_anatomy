@@ -1,9 +1,14 @@
 /* Курс по БПЛА · розділ «Пульт»: 3D-репліка TX16S з робочими стіками, тумблерами, потенціометрами, слайдерами
  * й тримами; канали EdgeTX (CH1–CH12), режими Betaflight (AUX-діапазони) і спрощений симулятор дрона, який
- * реагує на ті канали, що дійшли до польотника через ExpressLRS.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content → options → core → builders → whoop → anim → demos → signals → antlab → radio → guides → ui */
-'use strict';
+ * реагує на ті канали, що дійшли до польотника через ExpressLRS. */
+import * as T from 'three';
+import { fmt } from '../data/options.js';
+import { box, C, camera, canvas, canvasTex, css, cyl, glowSprite, ok3d, reduceMotion, rrect, scene, stageEl, TC, TEX } from '../engine/core.js';
+import { fitDist, label, LB, S, setView, smooth, toScreen, updateSpinBtn, wrapPi } from '../engine/anim.js';
+import { ctl, ndc, raycaster } from '../engine/demos.js';
+import { clamp, mesh, pressSeg } from './antlab.js';
+import { $, setHTML, setText } from '../ui/ui.js';
+
 /* ================= ПУЛЬТ TX16S ================= */
 const RDEG = Math.PI / 180;
 /* Органи керування в координатах лицьової панелі (см): x — праворуч, y — угору, z — до пілота.
@@ -72,7 +77,7 @@ const RAD_SCEN = [
   { id: 'fs', name: 'Втрата зв’язку', note: 'Дрон злітає й висить, а потім зв’язок обривається. За ≈0,3 с без пакетів — стадія 1: стіки по центру, газ на мінімумі, і дрон починає знижуватися. Через failsafe_delay — стадія 2: Drop вимикає мотори, Land сідає з фіксованим газом. Поверніть зв’язок кнопкою нижче й вимкніть ARM, щоб армуватися знову.' }
 ];
 
-const RAD = {
+export const RAD = {
   st: { lx: 0, ly: -1, rx: 0, ry: 0 }, hold: { L: 0, R: 0 },
   sw: {}, swDir: {}, an: { S1: 0, S2: 0, LS: 0, RS: 0 }, six: 0,
   trim: { T1: 0, T2: 0, T3: 0, T4: 0, T5: 0, T6: 0 },
@@ -83,7 +88,7 @@ const RAD = {
   pressed: {}, earlyT: 0
 };
 SW_ORDER.forEach(k => { RAD.sw[k] = 0; RAD.swDir[k] = 1; });
-const FCS = {
+export const FCS = {
   ch: new Array(16).fill(1500), last: null, lostT: 0, fs: 0, fsT: 0, armed: false, latch: false, badrx: false, hadRx: true,
   flags: [], act: {}, mode: 'angle', turtle: false, crashed: false, msg: '', timer: 0, used: 0, volt: 16.8, cur: 0, beep: null, beepT: 0
 };
@@ -286,7 +291,6 @@ function radTilt() {
 /* ---------- симулятор дрона (метри, секунди) ---------- */
 function actualRate(s) { const a = Math.abs(s); return 70 * s + 600 * a * (0.54 * Math.pow(s, 5) + 0.46 * s); }
 function radResetDrone() {
-  if (!window.THREE) return;
   DRS.p = new T.Vector3(); DRS.v = new T.Vector3(); DRS.q = new T.Quaternion(); DRS.w = new T.Vector3();
   DRS.ground = true; DRS.inv = false; DRS.flip = 0; DRS.out = 0; DRS.wall = 0;
   FCS.crashed = false;
@@ -303,7 +307,7 @@ function drStep(dtAll) {
   const P = RAD_PHY, n = Math.max(1, Math.ceil(dtAll / 0.008)), dt = dtAll / n;
   for (let s = 0; s < n; s++) drSub(dt, P);
 }
-const _v1 = window.THREE ? new T.Vector3() : null, _v2 = window.THREE ? new T.Vector3() : null, _q1 = window.THREE ? new T.Quaternion() : null;
+const _v1 = new T.Vector3(), _v2 = new T.Vector3(), _q1 = new T.Quaternion();
 function drSub(dt, P) {
   const rc = FCS.rc || { roll: 0, pitch: 0, yaw: 0, thr: 0 };
   const q = DRS.q, w = DRS.w;
@@ -404,8 +408,8 @@ function radBeeper(dt) {
 }
 
 /* ================= 3D-МОДЕЛЬ ================= */
-let radG = null, radTX = null, radDr = null, radScreenCv = null, radScreenTex = null, radDecalCv = null, radDecalTex = null;
-const RP = { stick: {}, sw: {}, pot: {}, sl: {}, trim: {}, six: [], nav: {}, anchor: {} };
+export let radG = null, radTX = null, radDr = null, radScreenCv = null, radScreenTex = null, radDecalCv = null, radDecalTex = null;
+export const RP = { stick: {}, sw: {}, pot: {}, sl: {}, trim: {}, six: [], nav: {}, anchor: {} };
 const RM = {};
 let radPick = [];
 function radMats() {
@@ -661,7 +665,7 @@ function radBuildArena() {
   RP.shadow = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: TEX.shadow, color: 0x000000, transparent: true, depthWrite: false, toneMapped: false }));
   RP.shadow.rotation.x = -Math.PI / 2; RP.shadow.renderOrder = -1; a.add(RP.shadow);
 }
-function radInit() {
+export function radInit() {
   radMats();
   radG = new T.Group(); radG.visible = false; scene.add(radG);
   radBuildArena();
@@ -671,7 +675,7 @@ function radInit() {
   radResetDrone(); radChannels(); radScreen();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { radDrawDecal(); radScreen(); });
 }
-function radEnter() {
+export function radEnter() {
   if (!radG) return;
   radG.visible = true; RP.arena.visible = true; radTX.visible = true;
   if (RAD.view === 'guide' || RAD.view === 'free') RAD.view = 'pilot';
@@ -679,21 +683,21 @@ function radEnter() {
   radFrame(RAD.view);
   RAD.scrT = 1; radDirtyUI();
 }
-function radExit() {
+export function radExit() {
   if (radG) radG.visible = false;
   for (const [k, e] of LB) if (k.startsWith('rad')) e.on = false;
   RAD.keys = {}; RAD.hold.L = RAD.hold.R = 0; RAD.hover = null;
   if (radGain) radGain.gain.value = 0;
   canvas.classList.remove('hovering');
 }
-function radTheme() { if (radG) drawRadGround(); }
+export function radTheme() { if (radG) drawRadGround(); }
 function radDronePos(out) {
   const P = RAD_PHY, p = DRS.p || { x: 0, y: 0, z: 0 };
   return (out || new T.Vector3()).set(p.x * P.U, p.y * P.U + 2.0, P.PADZ + p.z * P.U);
 }
 /* «Пілот»: камера стоїть над пультом (як очі пілота) і лише повертається: пульт унизу кадру, дрон — над ним.
  * Якщо дрон піднявся чи відлетів так, що обидва не влазять, у кадрі лишається дрон. */
-function radPilotAim() {
+export function radPilotAim() {
   const vf = camera.fov * RDEG, hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect);
   const D = Math.max(87, 15.5 / Math.tan(hf / 2)), el = 0.49;
   const pos = new T.Vector3(0, 14 + D * Math.sin(el), D * Math.cos(el));
@@ -708,7 +712,7 @@ function radPilotAim() {
   ctl.tYaw = ctl.yaw + wrapPi(yaw - ctl.yaw); ctl.tPitch = pitch; ctl.tDist = d;
   ctl.tTarget.set(pos.x - d * Math.cos(pitch) * Math.sin(yaw), pos.y - d * Math.sin(pitch), pos.z - d * Math.cos(pitch) * Math.cos(yaw));
 }
-function radFrame(view) {
+export function radFrame(view) {
   if (!ok3d || !radG) return;
   RAD.view = view || RAD.view;
   document.querySelectorAll('[data-rview]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.rview === RAD.view)));
@@ -720,7 +724,7 @@ function radFrame(view) {
 function radFreeView() { if (RAD.view !== 'free') { RAD.view = 'free'; document.querySelectorAll('[data-rview]').forEach(b => b.setAttribute('aria-pressed', 'false')); } }
 
 /* ---------- кадр: візуал ---------- */
-function radVisual(dt, now) {
+export function radVisual(dt, now) {
   const st = RAD.st, kk = 1 - Math.exp(-dt * 18);
   for (const id of ['L', 'R']) {
     const u = id === 'L' ? st.lx : st.rx, v = id === 'L' ? st.ly : st.ry, piv = RP.stick[id];
@@ -825,14 +829,14 @@ function radInputs(dt) {
   }
   radWarnCheck();
 }
-function radStep(dt) {
+export function radStep(dt) {
   radInputs(dt);
   radChannels();
   fcStep(dt);
   if (DRS.p) drStep(dt);
   radBeeper(dt);
 }
-function tickRad(dt, now) {
+export function tickRad(dt, now) {
   if (!radG) return;
   radStep(dt);
   radVisual(dt, now);
@@ -841,7 +845,7 @@ function tickRad(dt, now) {
 }
 
 /* ---------- екран пульта (EdgeTX, спрощено) ---------- */
-function radScreen() {
+export function radScreen() {
   if (!radScreenCv) return;
   const x = radScreenCv.getContext('2d'), W = 480, H = 272, F = (w, s) => `${w} ${s}px "IBM Plex Mono", ui-monospace, monospace`;
   const AC = '#ffb21a', TX = '#e9ecef', MU = '#8f99a3', BG = '#171b20', PN = '#20262d';
@@ -933,9 +937,9 @@ function radFM() {
 
 /* ================= ВКАЗІВНИК НА 3D-ПУЛЬТІ ================= */
 const radPtr = new Map();
-function radOwns(id) { return radPtr.has(id); }
+export function radOwns(id) { return radPtr.has(id); }
 /* органи 3D-пульта відгукуються в розділі «Пульт» і на кроках гайдів, де показано пульт */
-function radPtrOn() { return !!radTX && radG.visible && radTX.visible && (S.mode === 'radio' || S.mode === 'guides'); }
+export function radPtrOn() { return !!radTX && radG.visible && radTX.visible && (S.mode === 'radio' || S.mode === 'guides'); }
 function radHit(cx, cy) {
   if (!radTX || !radTX.visible) return null;
   const r = canvas.getBoundingClientRect();
@@ -958,7 +962,7 @@ function ctlId(h) {
   if (h.k === 'stick' || h.k === 'sw' || h.k === 'pot' || h.k === 'slider' || h.k === 'trim' || h.k === 'nav') return h.id;
   return { six: '6P', roller: 'ROLL', pwr: 'PWR', ant: 'ANT' }[h.k] || null;
 }
-function radDown(e) {
+export function radDown(e) {
   const h = radHit(e.clientX, e.clientY); if (!h || h.k === 'screen') return false;
   const p = stagePt(e), g = { k: h.k, id: h.id, x0: p.x, y0: p.y, lx: p.x, ly: p.y, moved: 0, shift: e.shiftKey };
   if (h.k === 'stick') {
@@ -980,7 +984,7 @@ function radDown(e) {
   radPtr.set(e.pointerId, g);
   return true;
 }
-function radMove(e) {
+export function radMove(e) {
   const g = radPtr.get(e.pointerId); if (!g) return;
   const p = stagePt(e), dx = p.x - g.lx, dy = p.y - g.ly; g.lx = p.x; g.ly = p.y;
   g.moved = Math.max(g.moved, Math.hypot(p.x - g.x0, p.y - g.y0));
@@ -999,7 +1003,7 @@ function radMove(e) {
     while (Math.abs(g.acc) > 28) { const d = Math.sign(g.acc); g.acc -= d * 28; RAD.roller += d; radNav(d > 0 ? 'PAGE>' : 'PAGE<'); }
   }
 }
-function radUp(e) {
+export function radUp(e) {
   const g = radPtr.get(e.pointerId); if (!g) return;
   radPtr.delete(e.pointerId);
   if (g.k === 'stick') RAD.hold[g.id] = 0;
@@ -1010,19 +1014,19 @@ function radUp(e) {
   else if (g.k === 'pwr' && e.type === 'pointerup') { radPower(!RAD.power); radTipCtl('PWR'); }
   else if (g.k === 'ant' && g.moved < 6) { RAD.ant = RAD.ant ? 0 : 1; radTipCtl('ANT'); }
 }
-function radHover(cx, cy) {
+export function radHover(cx, cy) {
   const h = radHit(cx, cy), id = h ? ctlId(h) : null;
   canvas.classList.toggle('hovering', !!id);
   if (id !== RAD.hover) { RAD.hover = id; if (id) RAD.tipHtml = radCtlTip(id); }
 }
-function radWheel(e) {
+export function radWheel(e) {
   const h = radHit(e.clientX, e.clientY); if (!h) { radFreeView(); return false; }
   const d = e.deltaY > 0 ? -1 : 1;
   if (h.k === 'pot' || h.k === 'slider') { RAD.an[h.id] = clamp(Math.round((RAD.an[h.id] + d * 0.05) * 100) / 100, -1, 1); radTipCtl(h.id); return true; }
   if (h.k === 'roller') { RAD.roller -= d; radNav(d < 0 ? 'PAGE>' : 'PAGE<'); return true; }
   return false;
 }
-function radDblClick(e) {
+export function radDblClick(e) {
   const h = radHit(e.clientX, e.clientY);
   if (h && (h.k === 'pot' || h.k === 'slider')) { RAD.an[h.id] = 0; radTipCtl(h.id); return true; }
   return !!h;
@@ -1030,12 +1034,12 @@ function radDblClick(e) {
 
 /* ================= ПАНЕЛЬ ================= */
 let radUIDirty = true;
-function radDirtyUI() { radUIDirty = true; }
+export function radDirtyUI() { radUIDirty = true; }
 function radSwBtn(id) {
   const d = SWITCHES[id];
   return `<button type="button" class="swb" data-rsw="${id}"><b>${id}</b><span class="pips n${d.n}">${d.n === 3 ? '<i></i><i></i><i></i>' : '<i></i><i></i>'}</span><small data-rsr="${id}"></small></button>`;
 }
-function radUIInit() {
+export function radUIInit() {
   const el = $('radPanel'); if (!el) return;
   $('radSw').innerHTML = SW_ORDER.map(radSwBtn).join('');
   $('radAn').innerHTML = ['S1', 'S2', 'LS', 'RS'].map(id => `<label class="slider" for="ra${id}"><span>${id}</span><input type="range" id="ra${id}" data-ran="${id}" min="-100" max="100" step="1" value="0"><output id="ra${id}Out" for="ra${id}">0</output></label>`).join('')
@@ -1131,7 +1135,7 @@ function radResetAll(full) {
   if (full) { radDefaults(); RAD.an.S1 = RAD.an.S2 = RAD.an.LS = RAD.an.RS = 0; RAD.six = 0; }
   radResetDrone(); radDirtyUI();
 }
-function radScenario(id) {
+export function radScenario(id) {
   const s = RAD_SCEN.find(q => q.id === id); if (!s) return;
   radResetAll(true); RAD.scen = id;
   if (id === 'trim') { RAD.trim.T3 = 20; radHighlight('T3'); }
@@ -1144,7 +1148,7 @@ function radScenario(id) {
   radDirtyUI(); radReadout();
 }
 function radHighlight(id, sec = 4) { RAD.hl = id; RAD.hlT = sec; }
-function radReadout() {
+export function radReadout() {
   const el = $('radPanel'); if (!el || el.hidden) return;
   const v = radVerdict(), map = BF_MAPS[RAD.map], ch = FCS.ch;
   const stat = $('radStat'); stat.className = 'rad-stat ' + v.cls;

@@ -1,20 +1,31 @@
-/* Smoke-тест: відкриває сторінку на десктопній і мобільній ширині, проходить усі платформи й розділи
+/* Smoke-тест: відкриває зібрану сторінку (dist/) на десктопній і мобільній ширині, проходить усі платформи й розділи
  * (3D-будова, Сигнали, Антени з ретранслятором, Пульт, Гайди), анімації, варіанти конфігуратора, сценарії
  * антенного стенду, ретранслятора й пульта, усі кроки гайдів і бічну панель.
  * Перевіряє помилки консолі та горизонтальне прокручування.
- * Запуск: npm install && npx playwright install chromium && npm test */
-const { chromium } = require('playwright');
-const path = require('path');
-const fs = require('fs');
-const { pathToFileURL } = require('url');
+ * Запуск: npm install && npx playwright install chromium && npm test (спершу збирає dist/) */
+import { chromium } from 'playwright';
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(__dirname, '..');
-const shotsDir = path.join(__dirname, 'shots');
+const here = path.dirname(fileURLToPath(import.meta.url));
+const dist = path.resolve(here, '..', 'dist');
+const shotsDir = path.join(here, 'shots');
 fs.mkdirSync(shotsDir, { recursive: true });
+if (!fs.existsSync(path.join(dist, 'index.html'))) { console.error('Немає dist/index.html — спершу npm run build'); process.exit(1); }
 
-// Якщо three@0.128.0 встановлено як devDependency, тест не залежить від CDN.
-let threeLocal = null;
-try { threeLocal = require.resolve('three/build/three.min.js', { paths: [root] }); } catch (e) { threeLocal = null; }
+/* мінімальний статичний сервер для dist/: ES-модулі не відкриваються з file:// */
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
+const server = http.createServer((req, res) => {
+  const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, '') || 'index.html';
+  const file = path.join(dist, rel);
+  if (!file.startsWith(dist) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
+  res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
+  fs.createReadStream(file).pipe(res);
+});
+await new Promise(r => server.listen(0, '127.0.0.1', r));
+const URL_BASE = `http://127.0.0.1:${server.address().port}/`;
 
 const PLATFORMS = ['p5', 'p7', 'p10', 'hex', 'whoop'];
 const SLOTS = ['frame', 'motors', 'props', 'esc', 'fc', 'rx', 'vtx', 'vtxant', 'cam', 'battery', 'power', 'gps'];
@@ -39,17 +50,12 @@ const VIEWPORTS = [
   let failed = false;
   for (const { name, full, ...opts } of VIEWPORTS) {
     const ctx = await browser.newContext(opts);
-    if (threeLocal) {
-      await ctx.route('https://cdnjs.cloudflare.com/**', r => r.fulfill({
-        path: threeLocal, contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' }
-      }));
-    }
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(String(e)));
     page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/i.test(m.text())) errors.push(m.text()); });
 
-    await page.goto(pathToFileURL(path.join(root, 'index.html')).href);
+    await page.goto(URL_BASE);
     await page.waitForFunction(() => document.querySelectorAll('#bom li[data-id]').length === 12, null, { timeout: 20000 });
     await page.waitForTimeout(2000);
     const webgl = await page.evaluate(() => document.getElementById('fallback').hidden);
@@ -99,8 +105,8 @@ const VIEWPORTS = [
     for (const sw of SWITCHES) { await click(`#radSw [data-rsw="${sw}"]`); await page.waitForTimeout(60); }
     for (const s of RADIO) { await click(`#radScen [data-rscen="${s}"]`); await page.waitForTimeout(200); }
     await click('#radSw [data-rsw="SF"]');
-    await page.waitForFunction(() => FCS.armed, null, { timeout: 8000 }).catch(() => {});
-    const armed = await page.evaluate(() => FCS.armed);
+    await page.waitForFunction(() => window.__fpv.FCS.armed, null, { timeout: 8000 }).catch(() => {});
+    const armed = await page.evaluate(() => window.__fpv.FCS.armed);
     for (const v of ['radio', 'drone', 'pilot']) if (webgl) { await click(`[data-rview="${v}"]`); await page.waitForTimeout(200); }
     await overflow();
     await page.screenshot({ path: path.join(shotsDir, `${name}-radio.png`) });
@@ -130,6 +136,6 @@ const VIEWPORTS = [
     if (!ok) failed = true;
     await ctx.close();
   }
-  await browser.close();
+  await browser.close(); server.close();
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

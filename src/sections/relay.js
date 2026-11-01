@@ -1,12 +1,17 @@
 /* Курс по БПЛА · розділ «Антени» → «Ретранслятор»: зв’язок станції з дроном за горою напряму й через
  * ретранслятор на вершині; бюджет кожного прольоту, дифракція на перешкоді, цифровий і аналоговий ретранслятор,
  * розв’язка частот. Місцевість — лісистий хребет із полониною на вершині, передгір’я, озеро, дорога, поля, небо.
- * Анімація будови ретранслятора й проходження сигналу через його вузли.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content → options → core → builders → whoop → anim → demos → signals → antlab → relay → radio → guides → ui */
-'use strict';
+ * Анімація будови ретранслятора й проходження сигналу через його вузли. */
+import * as T from 'three';
+import { fmt } from '../data/options.js';
+import { box, C, camera, css, cyl, glowSprite, narrowMQ, ok3d, reduceMotion, scene, TC, TEX, UP } from '../engine/core.js';
+import { fitDist, label, LB, S, setView, smooth, updateSpinBtn } from '../engine/anim.js';
+import { ctl } from '../engine/demos.js';
+import { clamp, dbm, fmt1, fmtKm, LAB, labApply, labFrame, labG, labReadout, labSolve, LCH, LM, mesh, pressSeg, rod, sgn1 } from './antlab.js';
+import { $, onModeUI, setHTML, setText } from '../ui/ui.js';
+
 /* ================= РЕТРАНСЛЯТОР ================= */
-const RLY = {
+export const RLY = {
   ch: 'e24', on: true, kind: 'digital', freq: 'diff', d1: 1.5, d2: 2.0, hill: 120, alt: 40, pw: { e24: 250, e9: 250, video: 600 },
   view: 'link', ex: 0, t: 0, scen: 'top', res: null, dirty: true, fres: true, shade: true
 };
@@ -38,7 +43,7 @@ function knifeLoss(h, d1m, d2m, lam) {
   return { v, j: v <= -0.78 ? 0 : 6.9 + 20 * Math.log10(Math.sqrt((v - 0.1) * (v - 0.1) + 1) + v - 0.1) };
 }
 const fsplDb = (km, f) => 20 * Math.log10(Math.max(km, 0.001)) + 20 * Math.log10(f) + 32.44;
-function relSolve() {
+export function relSolve() {
   const c = LCH[RLY.ch], G = RLY_G[RLY.ch], pw = RLY.pw[RLY.ch], ptx = dbm(pw);
   const sens = c.rates ? c.rates.find(q => q[0] === LAB.rate[RLY.ch])[1] : c.sens;
   const lam = 299.792458 / c.f, hS = 5, hR = RLY.hill + 3, D = RLY.d1 + RLY.d2;
@@ -429,7 +434,7 @@ function relRepeater(parent) {
   relParts.antRx.g.add(aR); relParts.antTx.g.add(aT);
   return { g, head, base, aR, aT };
 }
-function relInit() {
+export function relInit() {
   relG = new T.Group(); relG.visible = false; scene.add(relG);
   relScen = new T.Group(); relG.add(relScen);
   relHemi = new T.HemisphereLight(0xd2e5ff, 0x5c7742, 0.32); relG.add(relHemi);
@@ -446,19 +451,19 @@ function relInit() {
     f.renderOrder = 3; relG.add(f); relFres.push(f);
   }
 }
-function relEnter() {
+export function relEnter() {
   if (!relG) return;
   relEnsureScenery();
   labG.visible = false; relG.visible = true; ctl.auto = false; updateSpinBtn();
   relAtmos(true);
   RLY.dirty = true; RLY.res = relSolve(); relApply(RLY.res); relReadout(RLY.res); relFrame();
 }
-function relExit() {
+export function relExit() {
   if (relG) relG.visible = false;
   relAtmos(false);
   for (const [k, e] of LB) if (k.startsWith('rel')) e.on = false;
 }
-function relTheme() { RLY.dirty = true; if (relG && relG.visible && relSky) relAtmos(true); }
+export function relTheme() { RLY.dirty = true; if (relG && relG.visible && relSky) relAtmos(true); }
 function rodTo(m, a, b, r) { const d = b.clone().sub(a), len = d.length(); m.position.copy(a).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(UP, d.normalize()); m.scale.set(r, len, r); }
 function relLayout() {
   RL.H = RLY.hill * RL.V;
@@ -566,7 +571,7 @@ function relAnimate(dt) {
     p.s.position.copy(pos); p.s.material.opacity = alpha;
   });
 }
-function tickRel(dt) {
+export function tickRel(dt) {
   if (!relG) return;
   RLY.t += reduceMotion ? 0 : dt;
   if (RLY.terr) { RLY.terr = false; relTerrainUpdate(); RLY.dirty = true; }
@@ -574,7 +579,7 @@ function tickRel(dt) {
   if (relSky) relSky.position.copy(camera.position);
   relAnimate(dt);
 }
-function relFrame() {
+export function relFrame() {
   if (!ok3d || !relG) return;
   if (RLY.view === 'build') { const h = relRepG.head.getWorldPosition(new T.Vector3()); setView(h.clone().add(new T.Vector3(0, 1.0, 1.5)), 0.12, 0.26, fitDist(9.8)); return; }
   const x1 = -relX(RLY.d1), x2 = relX(RLY.d2), H = RLY.hill * RL.V;
@@ -583,7 +588,7 @@ function relFrame() {
 }
 
 /* ---------- панель ---------- */
-function relReadout(r) {
+export function relReadout(r) {
   const v = relVerdict(r.margin);
   const vEl = $('relVerdict'); if (!vEl) return;
   vEl.className = 'lab-verdict ' + v.cls;
@@ -612,7 +617,7 @@ function relReadout(r) {
     const w = `${clamp((r.margin + 20) / 60 * 100, 2, 100).toFixed(1)}%`, bar = $('lhBar'); if (bar.style.width !== w) bar.style.width = w;
   }
 }
-function relSync() {
+export function relSync() {
   const set = (id, val, out) => { const el = $(id); if (el && +el.value !== val) el.value = val; setText($(id + 'Out'), out); };
   set('relD1', Math.round(RLY.d1 * 10), fmtKm(RLY.d1)); set('relD2', Math.round(RLY.d2 * 10), fmtKm(RLY.d2));
   set('relHill', RLY.hill, `${fmt(RLY.hill)} м`); set('relAlt', RLY.alt, `${fmt(RLY.alt)} м`);
@@ -656,7 +661,7 @@ function relScenario(id) {
     RLY.res = relSolve(); relApply(RLY.res); relReadout(RLY.res); relFrame();
   }
 }
-function relSetSub(sub) {
+export function relSetSub(sub) {
   LAB.sub = sub;
   pressSeg($('antSub'), 'asub', sub);
   $('labBody').hidden = sub !== 'lab'; $('relBody').hidden = sub !== 'relay';
@@ -667,7 +672,7 @@ function relSetSub(sub) {
   if (sub === 'relay') { for (const [k, e] of LB) if (k.startsWith('lab')) e.on = false; relEnter(); }
   else { relExit(); labG.visible = true; LAB.dirty = true; LAB.res = labSolve(); labApply(LAB.res); labReadout(LAB.res); labFrame(LAB.orbit ? 'orbit' : 'link'); }
 }
-function relUIInit() {
+export function relUIInit() {
   if (!$('relBody')) return;
   $('relCh').innerHTML = Object.entries(LCH).map(([id, c]) => `<button type="button" data-rch="${id}">${c.name}</button>`).join('');
   $('relScen').innerHTML = RLY_SCEN.map(s => `<button type="button" data-rscn="${s.id}">${s.name}</button>`).join('');

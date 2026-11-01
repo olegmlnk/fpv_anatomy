@@ -1,11 +1,22 @@
-/* Курс по БПЛА · анімації моторів, польотника й приймача, режими, головний цикл, вказівник.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
-'use strict';
+/* Курс по БПЛА · анімації моторів, польотника й приймача, режими, головний цикл, вказівник. */
+import * as T from 'three';
+import { ORDER } from '../data/content.js';
+import { cfg, numN, plat, setPlatform } from '../data/options.js';
+import { C, camera, canvas, clearComp, compInit, comps, computeLayout, initSceneGraph, L, makeTextures, narrowMQ, ok3d, readTheme, reduceMotion, renderer, root, scene, stageEl, TC, TEX } from './core.js';
+import { BUILD, EXPLODE } from '../models/builders.js';
+import { applyLook, arrows, buildEnv, calloutPos, clearSel, compBox, drawMat, droneCenter, FC, fitDist, flashDots, focusComp, homeView, kScale, label, LB, makeArrow, makeBrackets, makeRadio, makeUSB, makeWheelbase, matTex, MOT, motorDirs, motorNames, packets, positionArrows, radio, rings, RX, S, scaleMat, select, setBrackets, setHover, setView, showPeek, smooth, stopTour, tickTour, updateLabels, updateLeader, updatePropHands, updateSpinBtn, updateWheelbase, usbG, wbLine } from './anim.js';
+import { sigEnter, sigExit, sigInit, sigRebuild, sigTheme, tickSig } from '../sections/signals.js';
+import { labEnter, labExit, labInit, labTheme, tickLab } from '../sections/antlab.js';
+import { RAD, radDblClick, radDown, radEnter, radExit, radHover, radInit, radMove, radOwns, radPtrOn, radTheme, radUp, radWheel, tickRad } from '../sections/radio.js';
+import { guideEnter, guideExit, tickGuide } from '../sections/guides.js';
+import { onModeUI, onSelectUI, openDrawer, updateDemoUI } from '../ui/ui.js';
+
 /* ================= DEMOS, MODES, REBUILD, LOOP, POINTER ================= */
+/* стан камери, вибору й службових мешів — створюється в initScene() */
+export let ctl, raycaster, ndc, pickables = [], brkHover, brkSel, matMesh, shadowMesh, flashCurve = null;
 const statusEl = document.getElementById('status');
-function setStatus(t) { if (!t) { statusEl.hidden = true; return; } statusEl.hidden = false; if (statusEl.textContent !== t) statusEl.textContent = t; }
-function stopDemos() {
+export function setStatus(t) { if (!t) { statusEl.hidden = true; return; } statusEl.hidden = false; if (statusEl.textContent !== t) statusEl.textContent = t; }
+export function stopDemos() {
   if (!S.demo) return;
   S.demo = null; setStatus(null); applyLook();
 }
@@ -24,14 +35,14 @@ function enterDemo(kind) {
   }
   applyLook(); showPeek(S.hover); onSelectUI(S.sel);
 }
-function motorCmd(cmd) {
+export function motorCmd(cmd) {
   if (cmd === 'stop') { MOT.mode = 'idle'; if (S.demo === 'mot') { S.demo = null; setStatus(null); applyLook(); } updateDemoUI(); return; }
   if (cmd === 'in' || cmd === 'out') { MOT.dir = cmd; MOT.mode = 'spin'; updatePropHands(); }
   if (cmd === 'test') { MOT.mode = 'test'; MOT.ti = 0; MOT.tt = 0; }
   if (ok3d) enterDemo('mot'); else S.demo = 'mot';
   updateDemoUI();
 }
-function fcCmd(cmd) {
+export function fcCmd(cmd) {
   if (cmd === 'run') { FC.mode = 'run'; FC.usbT = 0; FC.prog = 0; FC.flashed = false; }
   else if (cmd === 'dfu') { FC.mode = 'dfu'; FC.t = 0; FC.prog = 0; FC.flashed = false; }
   else if (cmd === 'flash' && FC.mode === 'dfu' && FC.t > 1.3) {
@@ -47,7 +58,7 @@ function fcCmd(cmd) {
   if (ok3d) enterDemo('fc'); else S.demo = 'fc';
   updateDemoUI();
 }
-function rxCmd(cmd) {
+export function rxCmd(cmd) {
   RX.mode = cmd; RX.t = 0; RX.spawn = 0; RX.tele = 0;
   packets.forEach(p => { p.on = false; p.s.visible = false; });
   if (ok3d) enterDemo('rx'); else S.demo = 'rx';
@@ -215,7 +226,7 @@ function tickRX(dt, now) {
 }
 
 /* ---------- explode & modes ---------- */
-function toggleExplode(on) {
+export function toggleExplode(on) {
   S.explodeOn = on == null ? !S.explodeOn : on;
   document.getElementById('tExplode').setAttribute('aria-pressed', String(S.explodeOn));
   S.ghost = false; applyLook();
@@ -225,7 +236,7 @@ function toggleExplode(on) {
     setView(new T.Vector3(0, c.y + 4.0 * plat().exS, c.z * 0.3), null, 0.3, fitDist(plat().fit * 1.28));
   } else setView(new T.Vector3(0, c.y * 0.9, c.z * 0.3), null, 0.44, fitDist(plat().fit));
 }
-function setMode(m) {
+export function setMode(m) {
   if (S.mode === m) return;
   S.mode = m;
   stopTour(); stopDemos();
@@ -243,7 +254,7 @@ function setMode(m) {
   }
   showPeek(null); onSelectUI(null); onModeUI(m);
 }
-function applyPlatform(id) {
+export function applyPlatform(id) {
   setPlatform(id);
   MOT.mode = 'idle'; MOT.ti = 0; FC.mode = 'run'; FC.usbT = 0; FC.usb = 0; FC.flashed = false; RX.mode = 'nolink';
   stopTour(); stopDemos();
@@ -259,7 +270,7 @@ function applyPlatform(id) {
 /* ---------- rebuild ---------- */
 function applyWireVis(id) { comps[id].meshes.forEach(m => { if (m.userData.wire) m.visible = S.wiresVis; }); }
 function refreshPickables() { pickables = []; for (const id of ORDER) comps[id].meshes.forEach(m => pickables.push(m)); }
-function rebuild(list, quiet) {
+export function rebuild(list, quiet) {
   S.ver = (S.ver || 0) + 1;
   if (!ok3d) return;
   if (list.includes('frame')) computeLayout();
@@ -282,16 +293,13 @@ function tickFlash(dt) {
 }
 
 /* ---------- init & loop ---------- */
-function initScene() {
+export function initScene() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputEncoding = T.sRGBEncoding;
   renderer.toneMapping = T.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.setClearColor(0x000000, 0);
-  scene = new T.Scene();
-  camera = new T.PerspectiveCamera(34, 1, 0.1, 900);
-  root = new T.Group(); scene.add(root);
-  overlay = new T.Group(); scene.add(overlay);
+  initSceneGraph();
   makeTextures(); readTheme(); buildEnv();
   scene.add(new T.HemisphereLight(0xffffff, 0x39423e, 0.5));
   const key = new T.DirectionalLight(0xffffff, 1.2); key.position.set(10, 18, -8); scene.add(key);

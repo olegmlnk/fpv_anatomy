@@ -1,7 +1,10 @@
-/* Курс по БПЛА · процедурні 3D-моделі вузлів для 5″, 7″, 10″ і гекси.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
-'use strict';
+/* Курс по БПЛА · процедурні 3D-моделі вузлів для 5″, 7″, 10″ і гекси. */
+import * as T from 'three';
+import { camOpt, cfg, fmt, opt, plat } from '../data/options.js';
+import { add, alignTo, armStart, battPos, bodyRear, box, C, capsule, comps, cyl, glowSprite, L, LAY, mk, rrect, slab, TEX, textTex, tube, UP } from '../engine/core.js';
+import { buildBatteryWhoop, buildCamWhoop, buildESCWhoop, buildFCWhoop, buildFrameWhoop, buildPowerWhoop, buildRXWhoop, buildVTXAntWhoop, buildVTXWhoop } from './whoop.js';
+import { motorDirs } from '../engine/anim.js';
+
 /* ================= BUILDERS: 5″, 7″, 10″, HEX ================= */
 function buildFrame() {
   if (plat().micro) return buildFrameWhoop();
@@ -514,13 +517,13 @@ function buildGPS() {
   tube(cid, [[gx - 0.7, y + 0.3, gz - 0.85], [gx * 0.5 - 1.15, Math.max(2.8, y - 0.6), Math.min(gz - 1.3, 3.2)], [-1.0, 1.95, 2.2], [-0.9, 1.86, 1.7]], 0.06, mk(cid, { c: '#3a3f45', r: 0.6 }), true);
 }
 
-const BUILD = { frame: buildFrame, motors: buildMotors, props: buildProps, esc: buildESC, fc: buildFC, rx: buildRX, vtx: buildVTX, vtxant: buildVTXAnt, cam: buildCam, battery: buildBattery, power: buildPower, gps: buildGPS };
-const EXPLODE = {
+export const BUILD = { frame: buildFrame, motors: buildMotors, props: buildProps, esc: buildESC, fc: buildFC, rx: buildRX, vtx: buildVTX, vtxant: buildVTXAnt, cam: buildCam, battery: buildBattery, power: buildPower, gps: buildGPS };
+export const EXPLODE = {
   frame: [0, 0, 0], motors: [0, 1.7, 0], props: [0, 4.2, 0], esc: [0, 1.4, 0], fc: [0, 3.2, 0],
   rx: [3.2, 0.6, 1.6], vtx: [-0.4, 1.8, 3.6], vtxant: [0, 2.6, 5.6], cam: [0, 0.7, -4.2],
   battery: [0, 10.2, 0], power: [-3.6, 1.2, 2.6], gps: [0, 7.6, 1.6]
 };
-const DEPENDS = {
+export const DEPENDS = {
   frame: ['frame', 'motors', 'props', 'esc'], motors: ['motors', 'props'], props: ['props'], esc: ['esc'],
   rx: ['rx'], vtx: ['frame', 'vtx', 'vtxant', 'cam'], fc: ['fc', 'cam'], vtxant: ['vtxant'], cam: ['frame', 'cam'], battery: ['frame', 'battery', 'power', 'gps'], power: ['power'], gps: ['gps']
 };

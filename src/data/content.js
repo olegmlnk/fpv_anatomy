@@ -1,11 +1,9 @@
-/* Курс по БПЛА · контент вузлів: описи, параметри, види; шлях відеопотоку.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
-'use strict';
-/* ================= CONTENT ================= */
-const ORDER = ['frame', 'motors', 'props', 'esc', 'fc', 'rx', 'vtx', 'vtxant', 'cam', 'battery', 'power', 'gps'];
+/* Курс по БПЛА · контент вузлів: описи, параметри, види; шлях відеопотоку. */
 
-const COMP = {
+/* ================= CONTENT ================= */
+export const ORDER = ['frame', 'motors', 'props', 'esc', 'fc', 'rx', 'vtx', 'vtxant', 'cam', 'battery', 'power', 'gps'];
+
+export const COMP = {
   frame: {
     name: 'Рама', cat: 'Конструкція',
     short: 'Силовий каркас: тримає всі вузли, приймає удари при падіннях і задає розмір пропелерів.',
@@ -289,7 +287,7 @@ const COMP = {
 };
 
 /* Відеотракт: аналог проти цифри (розділ «Камера») */
-const VIDEO_PATH = {
+export const VIDEO_PATH = {
   analog: [
     ['Камера', 'CMOS-сенсор → обробка (ISP) → композитний сигнал CVBS'],
     ['Польотник', 'OSD-чип AT7456E накладає символи: напругу, таймер, RSSI'],

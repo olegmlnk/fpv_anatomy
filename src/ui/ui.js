@@ -1,15 +1,24 @@
-/* Курс по БПЛА · перемикачі режимів і платформ, специфікація, конфігуратор, бічна панель, події.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content → options → core → builders → whoop → anim → demos → signals → antlab → radio → guides → ui */
-'use strict';
+/* Курс по БПЛА · перемикачі режимів і платформ, специфікація, конфігуратор, бічна панель, події. */
+import { COMP, ORDER, VIDEO_PATH } from '../data/content.js';
+import { calc, camOpt, cfg, DEFAULTS, fmt, fmtA, numN, opt, optsFor, plat, PLAT_ORDER, PLATFORMS, round5 } from '../data/options.js';
+import { comps, L, narrowMQ, ok3d, reduceMotion, setOk3d } from '../engine/core.js';
+import { DEPENDS } from '../models/builders.js';
+import { clearSel, FC, homeView, MOT, motorDirs, motorNames, RX, S, select, setHover, showPeek, startTour, stopTour, tourGo, updateSpinBtn } from '../engine/anim.js';
+import { applyPlatform, ctl, fcCmd, initScene, motorCmd, rebuild, rxCmd, setMode, stopDemos, toggleExplode } from '../engine/demos.js';
+import { SIG, sigRebuild, sigUIInit } from '../sections/signals.js';
+import { LAB, labFrame, labOpenFrom, labReadout, labRenderControls, labSolve, labUIInit } from '../sections/antlab.js';
+import { relReadout, relSolve, relSync, RLY } from '../sections/relay.js';
+import { RAD, radDirtyUI, radFrame, radReadout, radUIInit } from '../sections/radio.js';
+import { gdScene, gdUIInit } from '../sections/guides.js';
+
 /* ================= UI: MODES, PLATFORMS, BOM, DEMOS, CONFIGURATOR, DRAWER ================= */
-const $ = id => document.getElementById(id);
+export const $ = id => document.getElementById(id);
 const bomEl = $('bom'), slotsEl = $('slots'), statsEl = $('stats'), warnsEl = $('warns'), profEl = $('profile');
 const drawerEl = $('drawer'), drBody = $('drBody'), scrimEl = $('scrim');
 let lastCalc = null, deltaTimer = null;
 const fmtG = w => (w ? `${fmt(w, w % 1 ? 1 : 0)} г` : '—');
-const setText = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
-const setHTML = (el, h) => { if (el && el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; } };
+export const setText = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
+export const setHTML = (el, h) => { if (el && el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; } };
 
 const LEDE = {
   build: 'Наведіть або торкніться деталі — з’явиться підказка; подвійний клік відкриває повний опис з видами компонента. Праворуч — специфікація, анімації та конфігуратор: міняйте вузли й дивіться, як змінюються маса, тяга й час польоту.',
@@ -34,7 +43,7 @@ const GL_LABEL = {
   guides: '3D-ілюстрація до поточного кроку гайду: вузол дрона або орган керування пульта.'
 };
 
-function specsFor(id) {
+export function specsFor(id) {
   const r = lastCalc || calc(), o = id === 'cam' ? camOpt() : opt(id), N = plat().motors;
   switch (id) {
     case 'frame': return [['Геометрія', o.name], ['Колісна база', L.wb ? `${L.wb} мм` : o.sub], ['Маса', fmtG(o.g)]];
@@ -88,8 +97,8 @@ function markBOM() {
     li.classList.toggle('sel', li.dataset.id === S.sel);
   });
 }
-function onHoverUI() { markBOM(); }
-function onSelectUI() { markBOM(); }
+export function onHoverUI() { markBOM(); }
+export function onSelectUI() { markBOM(); }
 
 /* ---------- configurator ---------- */
 const LINK = ['', 'ближня', 'середня', 'далека', 'далека, стабільна', 'максимальна'];
@@ -153,7 +162,7 @@ function refreshAll(withDelta) {
   if (S.peekId) showPeek(S.peekId);
   updateDemoUI();
 }
-function setOpt(slot, val) {
+export function setOpt(slot, val) {
   cfg[slot] = val;
   if (slot === 'vtx' && opt('vtx').kind === 'analog' && opt('cam').digital) {
     const def = DEFAULTS[cfg.platform].cam; cfg.cam = def === 'hdcam' ? 'micro' : def;
@@ -198,7 +207,7 @@ const RX_NOTES = {
   linked: 'Постійне світло — зв’язок є. Пульт шле пакети керування, приймач повертає телеметрію: RSSI, LQ, напругу батареї.',
   wifi: 'Швидке блимання — Wi-Fi. Точка доступу «ExpressLRS RX», пароль expresslrs, сторінка 10.0.0.1: оновлення прошивки й налаштування без паяльника. Вмикається сама, якщо приймач довго не бачить пульта (типово 60 с).'
 };
-function updateDemoUI() {
+export function updateDemoUI() {
   const kv = opt('motors').kv, vNom = (lastCalc || calc()).vNom, N = plat().motors, notes = MOT_NOTES[plat().mixer];
   document.querySelectorAll('[data-mot]').forEach(b => {
     const m = b.dataset.mot;
@@ -283,7 +292,7 @@ function renderDrawer(id, keepScroll) {
   drBody.scrollTop = keepScroll ? st : 0;
   updateDemoUI();
 }
-function openDrawer(id) {
+export function openDrawer(id) {
   stopTour();
   if (S.mode === 'build' && (S.sel !== id || S.demo)) select(id);
   S.drawerOpen = true; S.drawerId = id;
@@ -292,13 +301,13 @@ function openDrawer(id) {
   scrimEl.hidden = !narrowMQ.matches;
   setTimeout(() => $('drClose').focus({ preventScroll: true }), 60);
 }
-function closeDrawer() {
+export function closeDrawer() {
   if (!S.drawerOpen) return;
   S.drawerOpen = false; drawerEl.classList.remove('open'); drawerEl.setAttribute('aria-hidden', 'true'); scrimEl.hidden = true;
 }
 
 /* ---------- modes ---------- */
-function onModeUI(m) {
+export function onModeUI(m) {
   document.querySelectorAll('#modeTabs [data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
   ['build', 'demos', 'config', 'foot'].forEach(id => { $(id).hidden = m !== 'build'; });
   $('sigPanel').hidden = m !== 'signals';
@@ -326,7 +335,7 @@ function onModeUI(m) {
   if (m === 'radio') { radDirtyUI(); radReadout(); }
 }
 const MODES = ['build', 'signals', 'antennas', 'radio', 'guides'];
-function goMode(m, fromHash) {
+export function goMode(m, fromHash) {
   if (!MODES.includes(m)) return;
   if (S.mode === m) return;
   if (ok3d) setMode(m);
@@ -386,7 +395,7 @@ function bindUI() {
   narrowMQ.addEventListener('change', () => { scrimEl.hidden = !(S.drawerOpen && narrowMQ.matches); });
 }
 
-function init() {
+export function init() {
   const startMode = (location.hash || '').slice(1);
   lastCalc = calc();
   renderPlatTabs(); renderStats(lastCalc, null); renderWarns(lastCalc); renderProfile(lastCalc);
@@ -394,7 +403,7 @@ function init() {
   if (ok3d) {
     try { initScene(); }
     catch (err) {
-      console.error(err); ok3d = false;
+      console.error(err); setOk3d(false);
       $('fallback').hidden = false; $('hint').hidden = true;
     }
   }
@@ -403,4 +412,3 @@ function init() {
   if (MODES.includes(startMode) && startMode !== 'build') goMode(startMode, true);
   window.addEventListener('hashchange', () => { const h = (location.hash || '').slice(1); goMode(MODES.includes(h) ? h : 'build', true); });
 }
-init();

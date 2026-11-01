@@ -1,14 +1,25 @@
 {
   "name": "fpv-anatomy",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "private": true,
+  "type": "module",
   "description": "Курс по БПЛА: 3D-будова FPV-дрона, сигнали, антени й ретранслятор, 3D-пульт TX16S із симулятором і гайди з Betaflight, EdgeTX, ExpressLRS — на Three.js",
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
-    "start": "npx --yes serve@14 .",
-    "test": "node tests/smoke.js"
+    "dev": "vite",
+    "build": "vite build",
+    "build:single": "vite build --mode single",
+    "preview": "vite preview",
+    "test": "vite build && node tests/smoke.js"
+  },
+  "dependencies": {
+    "three": "0.128.0"
   },
   "devDependencies": {
     "playwright": "^1.63.0",
-    "three": "0.128.0"
+    "vite": "~7.3.6",
+    "vite-plugin-singlefile": "~2.3.3"
   }
 }

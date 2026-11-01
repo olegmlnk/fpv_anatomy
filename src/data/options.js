@@ -1,16 +1,15 @@
-/* Курс по БПЛА · платформи, варіанти конфігуратора, розрахунок характеристик.
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
-'use strict';
+/* Курс по БПЛА · платформи, варіанти конфігуратора, розрахунок характеристик. */
+import { ORDER } from './content.js';
+
 /* ================= PLATFORMS & OPTIONS ================= */
-const PLATFORMS = {
+export const PLATFORMS = {
   p5: { id: 'p5', name: '5″ фрістайл', short: '5″', sub: '225 мм · 4–6S', motors: 4, mixer: 'quad', misc: 18, aggr: 2.6, exS: 1, fit: 17 },
   p7: { id: 'p7', name: '7″ лонг-рейндж', short: '7″', sub: '≈315 мм · 6S Li-ion', motors: 4, mixer: 'quad', misc: 24, aggr: 2.0, exS: 1.15, fit: 22 },
   p10: { id: 'p10', name: '10″ важкий', short: '10″', sub: '≈430 мм · 6–10S', motors: 4, mixer: 'quad', misc: 45, aggr: 1.8, exS: 1.35, fit: 30 },
   hex: { id: 'hex', name: 'Гексакоптер 7″', short: 'Гекса', sub: '6 моторів · Hex X', motors: 6, mixer: 'hex', misc: 50, aggr: 1.8, exS: 1.3, fit: 29 },
   whoop: { id: 'whoop', name: 'Tiny Whoop 75 мм', short: 'Whoop', sub: 'клас Air75 / Meteor75 · 1S', motors: 4, mixer: 'quad', misc: 2, aggr: 1.5, exS: 0.32, fit: 5.6, micro: true }
 };
-const PLAT_ORDER = ['p5', 'p7', 'p10', 'hex', 'whoop'];
+export const PLAT_ORDER = ['p5', 'p7', 'p10', 'hex', 'whoop'];
 const BIG = ['p5', 'p7', 'p10', 'hex'];
 
 const OPTS = {
@@ -126,32 +125,32 @@ const OPTS = {
   ]
 };
 
-const DEFAULTS = {
+export const DEFAULTS = {
   p5: { frame: 'truex', motors: 'm1950', props: 'p463', esc: 'e55', fc: 'f405', rx: 't', vtx: 'an1', vtxant: 'lolli', cam: 'micro', battery: 'b6s1300', power: 'cap35', gps: 'none', tilt: 30 },
   p7: { frame: 'x7', motors: 'm7a', props: 'p7353', esc: 'e55', fc: 'f722', rx: 'e900', vtx: 'an1', vtxant: 'lolli', cam: 'micro', battery: 'li6s1p', power: 'cap35', gps: 'm10', tilt: 25 },
   p10: { frame: 'x10', motors: 'm10a', props: 'p1053', esc: 'e70', fc: 'h743', rx: 'e900', vtx: 'an1', vtxant: 'pagoda', cam: 'th256', battery: 'li6s2p', power: 'xt90_50', gps: 'm10', tilt: 20 },
   hex: { frame: 'hex7', motors: 'm7a', props: 'p7353', esc: 'hx40', fc: 'h743', rx: 'e900', vtx: 'an1', vtxant: 'lolli', cam: 'micro', battery: 'li6s2p', power: 'xt90_50', gps: 'm10', tilt: 20 },
   whoop: { frame: 'w75', motors: 'mw1', props: 'pw40', esc: 'aio5', fc: 'aio1s', rx: 'aiorx', vtx: 'aiovtx', vtxant: 'whip', cam: 'c03', battery: 'w450', power: 'bt20', gps: 'none', tilt: 25 }
 };
-const cfg = Object.assign({ platform: 'p5' }, DEFAULTS.p5);
+export const cfg = Object.assign({ platform: 'p5' }, DEFAULTS.p5);
 
-function plat() { return PLATFORMS[cfg.platform]; }
-function optsFor(slot) { return OPTS[slot].filter(o => !o.pl || o.pl.includes(cfg.platform)); }
-function opt(slot) { return OPTS[slot].find(o => o.id === cfg[slot]) || optsFor(slot)[0]; }
-function camOpt() { return opt('vtx').kind === 'digital' ? OPTS.cam.find(o => o.id === 'hdcam') : opt('cam'); }
-function numN(id) { return ORDER.indexOf(id) + 1; }
-function setPlatform(id) { Object.assign(cfg, DEFAULTS[id], { platform: id }); }
-function battDims(b) { return b.cells ? [b.cells[0] * 2.1, b.cells[1] * 2.1, b.cells[2] * 7.0] : b.dim; }
+export function plat() { return PLATFORMS[cfg.platform]; }
+export function optsFor(slot) { return OPTS[slot].filter(o => !o.pl || o.pl.includes(cfg.platform)); }
+export function opt(slot) { return OPTS[slot].find(o => o.id === cfg[slot]) || optsFor(slot)[0]; }
+export function camOpt() { return opt('vtx').kind === 'digital' ? OPTS.cam.find(o => o.id === 'hdcam') : opt('cam'); }
+export function numN(id) { return ORDER.indexOf(id) + 1; }
+export function setPlatform(id) { Object.assign(cfg, DEFAULTS[id], { platform: id }); }
+export function battDims(b) { return b.cells ? [b.cells[0] * 2.1, b.cells[1] * 2.1, b.cells[2] * 7.0] : b.dim; }
 const cellNom = b => (b.chem === 'liion' ? 3.6 : b.chem === 'lihv' ? 3.8 : 3.7);
 const cellFull = b => (b.chem === 'lihv' ? 4.35 : 4.2);
 
-const fmt = (v, d = 0) => v.toLocaleString('uk-UA', { minimumFractionDigits: d, maximumFractionDigits: d });
-const round5 = v => Math.round(v / 5) * 5;
-const fmtA = v => (v < 20 ? fmt(v, 1) : fmt(round5(v)));
+export const fmt = (v, d = 0) => v.toLocaleString('uk-UA', { minimumFractionDigits: d, maximumFractionDigits: d });
+export const round5 = v => Math.round(v / 5) * 5;
+export const fmtA = v => (v < 20 ? fmt(v, 1) : fmt(round5(v)));
 const fmtW = v => (v < 50 ? fmt(v, 1) : fmt(round5(v)));
 
 /* ---------- performance estimate ---------- */
-function calc() {
+export function calc() {
   const P = plat(), N = P.motors;
   const fr = opt('frame'), mo = opt('motors'), pr = opt('props'), es = opt('esc'), fc = opt('fc'), rx = opt('rx'),
     vt = opt('vtx'), va = opt('vtxant'), ba = opt('battery'), pw = opt('power'), gp = opt('gps'), cm = camOpt();

@@ -1,9 +1,10 @@
-/* Курс по БПЛА · 3D-моделі tiny whoop (AIO-плата, дакти).
- * Класичний скрипт: усі файли ділять глобальну область, порядок підключення важливий:
- * content.js → options.js → core.js → builders.js → whoop.js → anim.js → demos.js → signals.js → antlab.js → ui.js */
-'use strict';
+/* Курс по БПЛА · 3D-моделі tiny whoop (AIO-плата, дакти). */
+import * as T from 'three';
+import { camOpt, cfg, opt } from '../data/options.js';
+import { add, alignTo, battPos, box, comps, cyl, glowSprite, L, LAY, mk, rrect, slab, textTex, tube } from '../engine/core.js';
+
 /* ================= BUILDERS: TINY WHOOP (AIO) ================= */
-function buildFrameWhoop() {
+export function buildFrameWhoop() {
   const cid = 'frame', c = comps[cid], W = LAY();
   const plastic = mk(cid, { c: '#202428', r: 0.55, m: 0.05, side: T.DoubleSide });
   const canopy = mk(cid, { c: '#E8820F', r: 0.35, o: 0.5, dw: false, side: T.DoubleSide });
@@ -30,7 +31,7 @@ function buildFrameWhoop() {
   c.parts.top = null;
 }
 
-function buildESCWhoop() {
+export function buildESCWhoop() {
   const cid = 'esc', c = comps[cid], W = LAY(), y = W.boardY + 0.06;
   const fet = mk(cid, { c: '#0b0c0e', r: 0.45, m: 0.2 });
   const gold = mk(cid, { c: '#d5ab4f', m: 1, r: 0.3 });
@@ -45,7 +46,7 @@ function buildESCWhoop() {
   c.parts.kind = 'aio';
 }
 
-function buildFCWhoop() {
+export function buildFCWhoop() {
   const cid = 'fc', c = comps[cid], W = LAY(), o = opt('fc'), y = W.boardY;
   const pcb = mk(cid, { c: o.pcb, r: 0.5, m: 0.1 });
   const chipM = mk(cid, { c: '#222428', r: 0.45, keep: true });
@@ -73,7 +74,7 @@ function buildFCWhoop() {
   });
 }
 
-function buildRXWhoop() {
+export function buildRXWhoop() {
   const cid = 'rx', c = comps[cid], W = LAY(), y = W.boardY;
   add(cid, box(0.38, 0.06, 0.38), mk(cid, { c: '#26292d', r: 0.5 }), [0.85, y + 0.08, 0.6]);
   add(cid, box(0.28, 0.07, 0.12), mk(cid, { c: '#e9e3d1', r: 0.4 }), [1.12, y + 0.085, 1.05]);
@@ -83,7 +84,7 @@ function buildRXWhoop() {
   Object.assign(c.parts, { ledM, glow, antPts: [new T.Vector3(1.12, y + 0.15, 1.05)], board: new T.Vector3(0.85, y, 0.6), uart: new T.Vector3(0.4, y + 0.08, 0.2) });
 }
 
-function buildVTXWhoop() {
+export function buildVTXWhoop() {
   const cid = 'vtx', c = comps[cid], W = LAY(), y = W.boardY;
   add(cid, box(0.95, 0.16, 0.75), mk(cid, { c: '#cfd5da', m: 0.95, r: 0.28 }), [-0.35, y + 0.13, 0.85]);
   add(cid, cyl(0.07, 0.07, 0.08, 10), mk(cid, { c: '#d5ab4f', m: 1, r: 0.3 }), [0.02, y + 0.1, 1.2]);
@@ -93,7 +94,7 @@ function buildVTXWhoop() {
   });
 }
 
-function buildVTXAntWhoop() {
+export function buildVTXAntWhoop() {
   const cid = 'vtxant', c = comps[cid], W = LAY();
   const from = comps.vtx.parts.conns[0];
   const M = new T.Vector3(0, W.plateY + 1.2, 1.55), d = new T.Vector3(0, 0.75, 0.66).normalize();
@@ -103,7 +104,7 @@ function buildVTXAntWhoop() {
   c.parts.tips = [M.clone().addScaledVector(d, 1.7)]; c.parts.mounts = [M];
 }
 
-function buildCamWhoop() {
+export function buildCamWhoop() {
   const cid = 'cam', c = comps[cid], o = camOpt(), W = LAY(), s = o.size;
   const g = new T.Group(); g.position.set(0, 1.9, W.camZ); g.rotation.x = cfg.tilt * Math.PI / 180; c.g.add(g); c.parts.pivot = g;
   const body = mk(cid, { c: '#1f2225', r: 0.55, m: 0.15 });
@@ -118,7 +119,7 @@ function buildCamWhoop() {
   c.parts.out = new T.Vector3(0, 1.85, W.camZ + 0.45);
 }
 
-function buildBatteryWhoop() {
+export function buildBatteryWhoop() {
   const cid = 'battery', c = comps[cid], o = opt('battery'), bp = battPos(), { W, H, Lz, zc } = bp;
   const mah = Math.round(o.ah * 1000);
   const t = textTex([{ t: `1S ${mah}`, s: 54 }, { t: 'LiHV 4,35 В', s: 30, w: 500 }], { w: 512, h: 256, bg: o.col, fg: '#ffffff', lh: 58 });
@@ -131,7 +132,7 @@ function buildBatteryWhoop() {
   c.parts.rear = new T.Vector3(0, H / 2, bp.rear); c.parts.center = new T.Vector3(0, H / 2, zc);
 }
 
-function buildPowerWhoop() {
+export function buildPowerWhoop() {
   const cid = 'power', c = comps[cid], W = LAY(), bp = battPos();
   add(cid, box(0.44, 0.3, 0.42), mk(cid, { c: '#F2C230', r: 0.5 }), [0, 0.4, bp.rear + 0.67]);
   const red = mk(cid, { c: '#C9362B', r: 0.55 }), blk = mk(cid, { c: '#1b1d20', r: 0.6 });
