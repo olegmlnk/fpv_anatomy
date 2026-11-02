@@ -8,7 +8,8 @@ import { onHoverUI, onSelectUI, specsFor } from '../ui/ui.js';
 
 /* ================= STATE, OVERLAYS, LOOK, CAMERA, SELECTION ================= */
 export const S = { mode: 'build', hover: null, sel: null, ghost: false, explodeOn: false, ex: 0, demo: null, tour: false, tourI: 0, tourT: 0, peekId: null, wiresVis: true, ver: 0 };
-export const MOT = { mode: 'idle', dir: 'in', thr: 0.35, ang: [0, 0, 0, 0, 0, 0], vis: [0, 0, 0, 0, 0, 0], ti: 0, tt: 0 };
+/* bad — індекс мотора з неправильно встановленим пропом (−1 — усі правильні); badKind: 'dir' — проп не того напряму, 'flip' — догори дриґом */
+export const MOT = { mode: 'idle', dir: 'in', thr: 0.35, ang: [0, 0, 0, 0, 0, 0], vis: [0, 0, 0, 0, 0, 0], ti: 0, tt: 0, bad: -1, badKind: 'dir', badM: 0, flow: true };
 export const FC = { mode: 'run', t: 0, prog: 0, usb: 0, usbT: 0, btn: 0, flashed: false };
 export const RX = { mode: 'nolink', t: 0, spawn: 0, tele: 0 };
 const POS_NAMES = { quad: ['задній правий', 'передній правий', 'задній лівий', 'передній лівий'], hex: ['задній правий', 'передній правий', 'задній лівий', 'передній лівий', 'правий', 'лівий'] };
@@ -189,7 +190,12 @@ export function positionArrows() {
 export function updatePropHands() {
   const dirs = motorDirs(), pp = comps.props && comps.props.parts;
   dirs.forEach((d, i) => {
-    if (pp && pp.hand && pp.hand[i]) pp.hand[i].scale.x = d < 0 ? -1 : 1;
+    if (pp && pp.hand && pp.hand[i]) {
+      /* неправильний проп: не того напряму — дзеркальна форма лопатей; догори дриґом — перевернутий профіль */
+      const h = pp.hand[i], bad = MOT.bad === i, wrongDir = bad && MOT.badKind === 'dir', flip = bad && MOT.badKind === 'flip';
+      h.scale.x = (d < 0 ? -1 : 1) * (wrongDir ? -1 : 1);
+      h.rotation.x = flip ? Math.PI : 0; h.position.y = flip ? (L.hubH || 0.55) * 1.1 : 0;
+    }
     const g = arrows[i]; if (!g) return;
     const s = g.userData.s || 1;
     g.scale.set((d < 0 ? -1 : 1) * s, s, s);

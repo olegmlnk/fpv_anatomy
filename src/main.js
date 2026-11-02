@@ -1,6 +1,7 @@
 /* Курс по БПЛА · точка входу: стилі, ініціалізація інтерфейсу й 3D-сцени. */
 import './styles/main.css';
-import { S } from './engine/anim.js';
+import { MOT, S } from './engine/anim.js';
+import { TO } from './engine/thrust.js';
 import { goMode, init } from './ui/ui.js';
 import { FCS } from './sections/radio.js';
 import { RLY, relSetSub } from './sections/relay.js';
@@ -10,4 +11,4 @@ import { GOG } from './sections/goggles.js';
 init();
 
 /* Хук для автотестів і налагодження з консолі: стан розділів і перемикачі режимів. */
-window.__fpv = { S, FCS, RLY, LAB, GOG, goMode, relSetSub };
+window.__fpv = { S, MOT, TO, FCS, RLY, LAB, GOG, goMode, relSetSub };

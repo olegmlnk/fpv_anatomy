@@ -30,7 +30,8 @@ const URL_BASE = `http://127.0.0.1:${server.address().port}/`;
 const PLATFORMS = ['p5', 'p7', 'p10', 'hex', 'whoop'];
 const SLOTS = ['frame', 'motors', 'props', 'esc', 'fc', 'rx', 'vtx', 'vtxant', 'cam', 'battery', 'power', 'gps'];
 const DEMO_STEPS = [
-  '#dMot [data-mot="in"]', '#dMot [data-mot="out"]', '#dMot [data-mot="test"]', '#dMot [data-mot="stop"]',
+  '#dMot [data-mot="in"]', '#dMot [data-mot="out"]', '#dMot [data-mot="wrong"]', '#dMot [data-mot="bk:flip"]', '#dMot [data-mot="bm:0"]',
+  '#dMot [data-mot="takeoff"]', '#dMot [data-mot="bk:dir"]', '#dMot [data-mot="flow"]', '#dMot [data-mot="flow"]', '#dMot [data-mot="test"]', '#dMot [data-mot="stop"]',
   '#dFC [data-fc="dfu"]', '#dFC [data-fc="run"]',
   '#dRX [data-rx="bind"]', '#dRX [data-rx="linked"]', '#dRX [data-rx="wifi"]', '#dRX [data-rx="nolink"]',
   '#tExplode', '#tExplode', '#tTour', '#tTour', '#tReset'
@@ -80,6 +81,18 @@ const VIEWPORTS = [
       for (const c of CHAINS) { await click(`#sigTabs [data-chain="${c}"]`); await click('#sigNext'); await click('#sigNext'); await page.waitForTimeout(150); }
       await overflow();
     }
+    /* пропелери: проп не того напряму на M1 → зліт закінчується переворотом, рама повертається на місце */
+    await mode('build'); await click('#platTabs [data-plat="p5"]'); await page.waitForTimeout(300);
+    await click('#dMot [data-mot="wrong"]'); await click('#dMot [data-mot="bk:dir"]'); await click('#dMot [data-mot="bm:0"]');
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: path.join(shotsDir, `${name}-props.png`) });
+    await click('#dMot [data-mot="takeoff"]');
+    const toKind = await page.evaluate(() => window.__fpv.TO.on && window.__fpv.TO.kind);
+    /* у програмному рендерингу кадри повільні, а крок анімації обмежено 0,1 с — чекаємо з запасом */
+    await page.waitForFunction(() => !window.__fpv.TO.on, null, { timeout: 90000, polling: 500 }).catch(() => {});
+    const takeoff = !webgl || (toKind === 'flip' && await page.evaluate(() => !window.__fpv.TO.on));
+    await click('#dMot [data-mot="stop"]');
+
     await mode('antennas'); await page.waitForTimeout(400);
     for (const s of SCENARIOS) { await click(`#labScen [data-scen="${s}"]`); await page.waitForTimeout(250); }
     for (const ch of ['video', 'e24', 'e9']) { await click(`#labCh [data-ch="${ch}"]`); await page.waitForTimeout(200); }
@@ -148,8 +161,8 @@ const VIEWPORTS = [
     await overflow();
     await page.screenshot({ path: path.join(shotsDir, `${name}.png`) });
 
-    const ok = errors.length === 0 && drawerOpen && videoPath === 2 && maxOverflow <= 0 && !!verdict && !!relay && layers && armed && steps === 34 && goggles.an.steps === 10 && goggles.dg.steps === 10 && !!goggles.an.verdict && !!goggles.dg.verdict;
-    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: webgl=${webgl} swaps=${swaps} drawer=${drawerOpen} videoPath=${videoPath} lab="${verdict}" relay="${relay}" layers=${layers} armed=${armed} goggles="${goggles.an.verdict}/${goggles.dg.verdict}" guideSteps=${steps} overflow=${maxOverflow}px errors=${errors.length}`);
+    const ok = errors.length === 0 && takeoff && drawerOpen && videoPath === 2 && maxOverflow <= 0 && !!verdict && !!relay && layers && armed && steps === 34 && goggles.an.steps === 10 && goggles.dg.steps === 10 && !!goggles.an.verdict && !!goggles.dg.verdict;
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: webgl=${webgl} swaps=${swaps} drawer=${drawerOpen} videoPath=${videoPath} lab="${verdict}" relay="${relay}" layers=${layers} takeoff=${takeoff}(${toKind}) armed=${armed} goggles="${goggles.an.verdict}/${goggles.dg.verdict}" guideSteps=${steps} overflow=${maxOverflow}px errors=${errors.length}`);
     errors.forEach(e => console.log('  ' + e));
     if (!ok) failed = true;
     await ctx.close();

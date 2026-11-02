@@ -1,6 +1,6 @@
 {
   "name": "fpv-anatomy",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "private": true,
   "type": "module",
   "description": "Курс по БПЛА: 3D-будова FPV-дрона, сигнали, антени й ретранслятор, 3D-пульт TX16S із симулятором, FPV-окуляри (аналог і цифра) і гайди з Betaflight, EdgeTX, ExpressLRS — на Three.js",

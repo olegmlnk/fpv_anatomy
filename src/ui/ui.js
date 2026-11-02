@@ -5,6 +5,7 @@ import { comps, L, narrowMQ, ok3d, reduceMotion, setOk3d } from '../engine/core.
 import { DEPENDS } from '../models/builders.js';
 import { clearSel, FC, homeView, MOT, motorDirs, motorNames, RX, S, select, setHover, showPeek, startTour, stopTour, tourGo, updateSpinBtn } from '../engine/anim.js';
 import { applyPlatform, ctl, fcCmd, initScene, motorCmd, rebuild, rxCmd, setMode, stopDemos, toggleExplode } from '../engine/demos.js';
+import { TO } from '../engine/thrust.js';
 import { SIG, sigRebuild, sigUIInit } from '../sections/signals.js';
 import { LAB, labFrame, labOpenFrom, labReadout, labRenderControls, labSolve, labUIInit } from '../sections/antlab.js';
 import { relReadout, relSolve, relSync, RLY } from '../sections/relay.js';
@@ -187,8 +188,8 @@ function setTilt(v) {
 const MOT_NOTES = {
   quad: {
     idle: 'Вигляд згори, ніс від пілота. <b>Props In</b> — стандарт Betaflight: M1 і M4 крутяться за годинниковою, M2 і M3 — проти.',
-    in: '<b>Props In</b>: M1 (задній правий) і M4 (передній лівий) — за годинниковою, M2 і M3 — проти. Передні лопаті рухаються до центру рами. Діагональні пари крутяться в один бік, тому реактивні моменти компенсуються.',
-    out: '<b>Props Out</b> — реверс: усі напрями навпаки, передні лопаті рухаються назовні й менше закидають бруд на лінзу. У Betaflight вмикається опцією «Motor direction is reversed», а самі мотори перевертають DShot-командою або в ESC.',
+    in: '<b>Props In — пропи до камери</b>, стандарт Betaflight: M1 (задній правий) і M4 (передній лівий) — за годинниковою, M2 і M3 — проти. Передні лопаті рухаються до центру рами, тобто до камери. Діагональні пари крутяться в один бік, тому реактивні моменти компенсуються. Звично для більшості збірок, але на лінзу летить більше бруду.',
+    out: '<b>Props Out — пропи від камери</b>, реверс: усі напрями навпаки, передні лопаті рухаються назовні. Лінза менше брудниться, а на тісних поворотах дрон керованіший — особливо на тайні-вупах; натомість бруд летить на стек. У Betaflight: вкладка Motors → розділ Mixer → «Motor direction is reversed»; самі мотори перевертають кнопкою Motor direction у тій самій вкладці (пропи зняті) або в налаштуваннях ESC. Пропи ставлять під новий напрям.',
     test: 'Тест як у вкладці Motors у Betaflight: по черзі крутиться кожен мотор, а ви звіряєте номер і напрям зі схемою. Перевіряють тільки без пропелерів, тому вони тут напівпрозорі.'
   },
   hex: {
@@ -211,16 +212,35 @@ const RX_NOTES = {
   linked: 'Постійне світло — зв’язок є. Пульт шле пакети керування, приймач повертає телеметрію: RSSI, LQ, напругу батареї.',
   wifi: 'Швидке блимання — Wi-Fi. Точка доступу «ExpressLRS RX», пароль expresslrs, сторінка 10.0.0.1: оновлення прошивки й налаштування без паяльника. Вмикається сама, якщо приймач довго не бачить пульта (типово 60 с).'
 };
+/* неправильно встановлений проп: що відбувається і як перевірити */
+function badPropNote() {
+  const m = MOT.bad + 1, cw = motorDirs()[MOT.bad] < 0;
+  return MOT.badKind === 'dir'
+    ? `<b>M${m}: проп ${cw ? 'CCW' : 'CW'} на моторі ${cw ? 'CW' : 'CCW'}.</b> Лопаті йдуть «задом наперед» і женуть повітря вгору (червоний струмінь): цей кут не тримає, а тягне вниз. Щойно інші мотори наберуть оберти, дрон перекинеться через M${m} — натисніть «Спробувати зліт». Перевірка: на кожному моторі проп того самого напряму, що й мотор (CW чи CCW — позначено на пропі), заокруглена передня кромка лопаті йде першою за обертанням, а схема відповідає Props In чи Props Out у Betaflight.`
+    : `<b>M${m}: проп догори дриґом.</b> Напрям той самий, але профіль лопаті перевернутий: тяга кута в кілька разів менша, тож дрон на зльоті завалюється на M${m}. Верх пропа глянцевий, з маркуванням моделі біля маточини; низ матовий. Також перевірте, що гайка затягнута: проп, що прокручується, теж майже не тягне.`;
+}
+const FLOW_NOTE = ' Синіми струменями показано потік повітря: проп засмоктує його згори й відкидає вниз, а стрілки над моторами — тягу кожного кута.';
 export function updateDemoUI() {
   const kv = opt('motors').kv, vNom = (lastCalc || calc()).vNom, N = plat().motors, notes = MOT_NOTES[plat().mixer];
   document.querySelectorAll('[data-mot]').forEach(b => {
     const m = b.dataset.mot;
-    b.setAttribute('aria-pressed', String((m === 'test' && MOT.mode === 'test') || (MOT.mode === 'spin' && m === MOT.dir)));
-    if (m === 'test') setText(b, N > 4 ? 'Тест 1→6' : 'Тест 1→2→3→4');
+    let on;
+    if (m === 'test') { on = MOT.mode === 'test'; setText(b, N > 4 ? 'Тест 1→6' : 'Тест 1→2→3→4'); }
+    else if (m === 'in' || m === 'out') on = MOT.mode === 'spin' && MOT.bad < 0 && m === MOT.dir;
+    else if (m === 'wrong') on = MOT.bad >= 0;
+    else if (m === 'flow') on = MOT.flow;
+    else if (m === 'takeoff') on = TO.on;
+    else if (m.startsWith('bk:')) on = MOT.badKind === m.slice(3);
+    else if (m.startsWith('bm:')) on = MOT.badM === +m.slice(3);
+    else on = false;
+    b.setAttribute('aria-pressed', String(on));
   });
+  const bm = $('motBadM');
+  if (bm && bm.childElementCount !== N) setHTML(bm, Array.from({ length: N }, (_, i) => `<button type="button" data-mot="bm:${i}" aria-pressed="${MOT.badM === i}">M${i + 1}</button>`).join(''));
+  if ($('motBad')) $('motBad').hidden = MOT.bad < 0;
   const rpm = Math.round(kv * vNom * MOT.thr * 0.82 / 100) * 100;
-  setText($('motRo'), MOT.mode === 'idle' ? 'зупинені' : MOT.mode === 'test' ? `M${MOT.ti + 1} · ${motorNames()[MOT.ti] || ''}` : `${MOT.dir === 'in' ? 'Props In' : 'Props Out'} · ≈${fmt(rpm)} об/хв`);
-  setHTML($('motNote'), MOT.mode === 'idle' ? notes.idle : MOT.mode === 'test' ? notes.test : notes[MOT.dir]);
+  setText($('motRo'), MOT.mode === 'idle' ? 'зупинені' : MOT.mode === 'test' ? `M${MOT.ti + 1} · ${motorNames()[MOT.ti] || ''}` : MOT.bad >= 0 ? `помилка на M${MOT.bad + 1}` : `${MOT.dir === 'in' ? 'Props In' : 'Props Out'} · ≈${fmt(rpm)} об/хв`);
+  setHTML($('motNote'), MOT.mode === 'idle' ? notes.idle : MOT.mode === 'test' ? notes.test : MOT.bad >= 0 ? badPropNote() : notes[MOT.dir] + (MOT.flow ? FLOW_NOTE : ''));
   const fcKey = FC.mode === 'run' ? (FC.flashed ? 'flashed' : 'run') : FC.mode === 'dfu' ? (FC.t < 1.3 ? 'dfu0' : 'dfu') : 'flash';
   document.querySelectorAll('[data-fc]').forEach(b => {
     const m = b.dataset.fc;
@@ -245,7 +265,7 @@ export function updateDemoUI() {
 const sec = (t, h) => `<section class="dr-sec"><h3>${t}</h3>${h}</section>`;
 function animButtons(kind) {
   const N = plat().motors;
-  if (kind === 'mot') return `<div class="seg"><button type="button" data-mot="in">Props In</button><button type="button" data-mot="out">Props Out</button><button type="button" data-mot="test">Тест 1→${N}</button><button type="button" data-mot="stop">Стоп</button></div>`;
+  if (kind === 'mot') return `<div class="seg"><button type="button" data-mot="in">Пропи до камери</button><button type="button" data-mot="out">Пропи від камери</button><button type="button" data-mot="wrong">Неправильно встановлені</button><button type="button" data-mot="takeoff">Спробувати зліт</button><button type="button" data-mot="test">Тест 1→${N}</button><button type="button" data-mot="stop">Стоп</button></div>`;
   if (kind === 'fc') return '<div class="seg"><button type="button" data-fc="run">Робочий режим</button><button type="button" data-fc="dfu">Boot / DFU</button><button type="button" data-fc="flash">Прошити</button></div>';
   return '<div class="seg"><button type="button" data-rx="nolink">Немає зв’язку</button><button type="button" data-rx="bind">Біндинг</button><button type="button" data-rx="linked">Збінджено</button><button type="button" data-rx="wifi">Wi-Fi</button></div>';
 }

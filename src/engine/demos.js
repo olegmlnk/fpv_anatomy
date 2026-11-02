@@ -10,6 +10,7 @@ import { labEnter, labExit, labInit, labTheme, tickLab } from '../sections/antla
 import { RAD, radDblClick, radDown, radEnter, radExit, radHover, radInit, radMove, radOwns, radPtrOn, radTheme, radUp, radWheel, tickRad } from '../sections/radio.js';
 import { guideEnter, guideExit, tickGuide } from '../sections/guides.js';
 import { gogDown, gogEnter, gogExit, gogHover, gogInit, gogOwns, gogPtrOn, gogTheme, gogUp, gogWheel, GOG, tickGog } from '../sections/goggles.js';
+import { initThrust, takeoffStart, takeoffStop, takeoffThr, tickTakeoff, tickThrust, TO } from './thrust.js';
 import { onModeUI, onSelectUI, openDrawer, updateDemoUI } from '../ui/ui.js';
 
 /* ================= DEMOS, MODES, REBUILD, LOOP, POINTER ================= */
@@ -18,6 +19,7 @@ export let ctl, raycaster, ndc, pickables = [], brkHover, brkSel, matMesh, shado
 const statusEl = document.getElementById('status');
 export function setStatus(t) { if (!t) { statusEl.hidden = true; return; } statusEl.hidden = false; if (statusEl.textContent !== t) statusEl.textContent = t; }
 export function stopDemos() {
+  if (TO.on) takeoffStop();
   if (!S.demo) return;
   S.demo = null; setStatus(null); applyLook();
 }
@@ -27,7 +29,8 @@ function enterDemo(kind) {
   S.demo = kind; ctl.auto = false; updateSpinBtn();
   if (S.explodeOn) toggleExplode(false);
   const k = kScale();
-  if (kind === 'mot') { S.sel = 'motors'; S.ghost = false; const c = droneCenter(); setView(new T.Vector3(0, c.y, c.z * 0.3), 0, 1.02, fitDist(plat().fit * 0.95)); }
+  /* з потоком повітря — вигляд збоку зверху, щоб було видно струмені; без нього — згори, як у Betaflight */
+  if (kind === 'mot') { S.sel = 'motors'; S.ghost = false; const c = droneCenter(); setView(new T.Vector3(0, c.y, c.z * 0.3), 0, MOT.flow ? 0.62 : 1.02, fitDist(plat().fit * (MOT.flow ? 1.05 : 0.95))); }
   else if (kind === 'fc') { S.sel = 'fc'; S.ghost = true; focusComp('fc', -1.78, 0.5); }
   else if (kind === 'rx') {
     S.sel = 'rx'; S.ghost = true;
@@ -36,11 +39,44 @@ function enterDemo(kind) {
   }
   applyLook(); showPeek(S.hover); onSelectUI(S.sel);
 }
+/* вигляд для спроби зльоту: збоку, уздовж осі перевороту */
+function takeoffView() {
+  const v = TO.view;
+  setView(v.c.clone(), v.yaw, 0.24, fitDist(v.r));
+}
+const TO_MSG = {
+  ok: 'Пропи збігаються з напрямом моторів: усі тягнуть угору — дрон злітає рівно',
+  flip: m => `M${m} тягне вниз: інші мотори піднімають свої кути — дрон перекидається через M${m}`,
+  tip: m => `M${m} майже не тягне: дрон завалюється на цей кут і не злітає рівно`
+};
 export function motorCmd(cmd) {
-  if (cmd === 'stop') { MOT.mode = 'idle'; if (S.demo === 'mot') { S.demo = null; setStatus(null); applyLook(); } updateDemoUI(); return; }
-  if (cmd === 'in' || cmd === 'out') { MOT.dir = cmd; MOT.mode = 'spin'; updatePropHands(); }
+  if (cmd === 'stop') { if (TO.on) takeoffStop(); MOT.mode = 'idle'; if (S.demo === 'mot') { S.demo = null; setStatus(null); applyLook(); } updateDemoUI(); return; }
+  if (cmd === 'flow') {
+    MOT.flow = !MOT.flow;
+    /* увімкнули потік при зупинених моторах — запускаємо їх, інакше показувати нічого */
+    if (MOT.flow && MOT.mode === 'idle') { MOT.mode = 'spin'; updatePropHands(); }
+    if (MOT.mode !== 'idle' && !TO.on) { if (ok3d) enterDemo('mot'); else S.demo = 'mot'; }
+    updateDemoUI(); return;
+  }
+  if (cmd.startsWith('bk:') || cmd.startsWith('bm:')) {
+    if (cmd[1] === 'k') MOT.badKind = cmd.slice(3); else MOT.badM = +cmd.slice(3);
+    if (MOT.bad >= 0) {
+      if (TO.on) { takeoffStop(); if (ok3d) enterDemo('mot'); }
+      MOT.bad = MOT.badM; updatePropHands();
+    }
+    updateDemoUI(); return;
+  }
+  if (TO.on) takeoffStop();
+  if (cmd === 'in' || cmd === 'out') { MOT.dir = cmd; MOT.bad = -1; MOT.mode = 'spin'; updatePropHands(); }
+  if (cmd === 'wrong') { MOT.badM = Math.min(MOT.badM, L.mp.length - 1); MOT.bad = MOT.badM; MOT.mode = 'spin'; updatePropHands(); }
   if (cmd === 'test') { MOT.mode = 'test'; MOT.ti = 0; MOT.tt = 0; }
   if (ok3d) enterDemo('mot'); else S.demo = 'mot';
+  if (cmd === 'takeoff' && ok3d) {
+    if (S.explodeOn) toggleExplode(false);
+    if (MOT.mode === 'idle' || MOT.mode === 'test') MOT.mode = 'spin';
+    const kind = takeoffStart(); takeoffView();
+    setStatus(kind === 'ok' ? TO_MSG.ok : TO_MSG[kind](TO.i + 1));
+  }
   updateDemoUI();
 }
 export function fcCmd(cmd) {
@@ -76,12 +112,14 @@ function ledPattern(mode, t) {
 function tickMotors(dt) {
   const dirs = motorDirs(), pp = comps.props.parts, mp = comps.motors.parts, N = L.mp.length, names = motorNames(), k = kScale();
   if (MOT.mode === 'test') { MOT.tt += dt; if (MOT.tt > 1.7) { MOT.tt = 0; MOT.ti = (MOT.ti + 1) % N; updateDemoUI(); } }
-  const testing = MOT.mode === 'test', show = MOT.mode !== 'idle' && S.mode === 'build';
+  const testing = MOT.mode === 'test', show = MOT.mode !== 'idle' && S.mode === 'build' && !TO.on;
   for (let i = 0; i < 6; i++) {
     const e = label('m' + i, null, null);
     if (i >= N) { e.on = false; if (arrows[i]) arrows[i].visible = false; continue; }
     let target = 0;
-    if (MOT.mode === 'spin') target = MOT.thr;
+    const tt = takeoffThr();
+    if (tt != null) target = tt;
+    else if (MOT.mode === 'spin') target = MOT.thr;
     else if (testing && i === MOT.ti && MOT.tt > 0.15 && MOT.tt < 1.4) target = Math.max(0.3, MOT.thr);
     MOT.vis[i] += (target - MOT.vis[i]) * (1 - Math.exp(-dt * (target > MOT.vis[i] ? 3.5 : 2.4)));
     MOT.ang[i] += dirs[i] * MOT.vis[i] * 32 * dt;
@@ -100,15 +138,17 @@ function tickMotors(dt) {
       g.rotation.y += dirs[i] * dt * (0.6 + MOT.vis[i] * 2.2);
       g.userData.mat.opacity = testing ? (i === MOT.ti ? 0.95 : 0.22) : 0.92;
     }
-    const cw = dirs[i] < 0, p = L.mp[i];
-    label('m' + i, `<b>M${i + 1}</b> <i>${cw ? 'CW' : 'CCW'}</i>`, `mot ${cw ? 'cw' : 'ccw'}${testing && i !== MOT.ti ? ' dim' : ''}`);
+    const cw = dirs[i] < 0, p = L.mp[i], bad = MOT.bad === i;
+    label('m' + i, `<b>M${i + 1}</b> <i>${cw ? 'CW' : 'CCW'}</i>${bad ? `<em> · проп ${MOT.badKind === 'dir' ? (cw ? 'CCW' : 'CW') : 'догори дриґом'}</em>` : ''}`, `mot ${cw ? 'cw' : 'ccw'}${bad ? ' badp' : ''}${testing && i !== MOT.ti ? ' dim' : ''}`);
     e.pos = new T.Vector3(p.x, L.seatY + 2.6 * k + comps.props.ex.y * S.ex, p.z);
     e.on = show;
   }
+  if (TO.on) return;
   if (S.demo === 'mot' && testing) {
     const i = MOT.ti, cw = dirs[i] < 0;
     setStatus(`M${i + 1} — ${names[i]} — ${cw ? 'за годинниковою (CW)' : 'проти годинникової (CCW)'}`);
-  } else if (S.demo === 'mot') setStatus(MOT.dir === 'in' ? 'Props In: передні лопаті рухаються до центру' : 'Props Out: передні лопаті рухаються назовні');
+  } else if (S.demo === 'mot' && MOT.bad >= 0) setStatus(MOT.badKind === 'dir' ? `M${MOT.bad + 1}: проп не того напряму — струмінь іде вгору, кут тягне вниз` : `M${MOT.bad + 1}: проп догори дриґом — тяга кута в кілька разів менша`);
+  else if (S.demo === 'mot') setStatus(MOT.dir === 'in' ? 'Props In: передні лопаті рухаються до центру, до камери' : 'Props Out: передні лопаті рухаються назовні, від камери');
 }
 
 function tickFC(dt, now) {
@@ -258,7 +298,8 @@ export function setMode(m) {
 }
 export function applyPlatform(id) {
   setPlatform(id);
-  MOT.mode = 'idle'; MOT.ti = 0; FC.mode = 'run'; FC.usbT = 0; FC.usb = 0; FC.flashed = false; RX.mode = 'nolink';
+  if (TO.on) takeoffStop();
+  MOT.mode = 'idle'; MOT.ti = 0; MOT.bad = -1; MOT.badM = Math.min(MOT.badM, 3); FC.mode = 'run'; FC.usbT = 0; FC.usb = 0; FC.flashed = false; RX.mode = 'nolink';
   stopTour(); stopDemos();
   if (S.explodeOn) { S.explodeOn = false; S.ex = 0; document.getElementById('tExplode').setAttribute('aria-pressed', 'false'); }
   S.sel = null; S.ghost = false;
@@ -316,7 +357,7 @@ export function initScene() {
   for (let i = 0; i < 6; i++) arrows.push(makeArrow());
   brkHover = makeBrackets(0.55); brkSel = makeBrackets(1);
   makeUSB(); makeRadio();
-  sigInit(); labInit(); radInit(); gogInit();
+  initThrust(); sigInit(); labInit(); radInit(); gogInit();
   ctl = { target: new T.Vector3(0, 2.4, 0.3), tTarget: new T.Vector3(0, 2.4, 0.3), yaw: 2.45, tYaw: 2.45, pitch: 0.44, tPitch: 0.44, dist: 46, tDist: 46, auto: !reduceMotion, drag: false };
   raycaster = new T.Raycaster(); ndc = new T.Vector2();
   rebuild(ORDER.slice(), true);
@@ -360,7 +401,10 @@ function loop(nowMs) {
   const wv = S.ex < 0.02;
   if (wv !== S.wiresVis) { S.wiresVis = wv; ORDER.forEach(applyWireVis); }
 
-  tickMotors(dt); tickFC(dt, now); tickRX(dt, now); tickTour(dt); tickFlash(dt);
+  if (tickTakeoff(dt)) { if (S.demo === 'mot') enterDemo('mot'); updateDemoUI(); }
+  /* під час зльоту камера плавно йде за дроном по горизонталі */
+  else if (TO.on) { const v = TO.view; ctl.tTarget.set(v.c.x * 0.4 + TO.cur.x * 0.6, v.c.y, v.c.z * 0.4 + TO.cur.z * 0.6); }
+  tickMotors(dt); tickThrust(dt); tickFC(dt, now); tickRX(dt, now); tickTour(dt); tickFlash(dt);
   if (S.mode === 'signals') tickSig(dt, now);
   if (S.mode === 'antennas') tickLab(dt, now);
   if (S.mode === 'radio') tickRad(dt, now);

@@ -98,10 +98,19 @@
         <div class="bhead"><h2 id="hDemos">Анімації</h2><p class="eyebrow">3D-сцена реагує</p></div>
 
         <div class="demo" id="dMot">
-          <div class="demo-h"><h3>Мотори</h3><span class="ro" id="motRo">зупинені</span></div>
-          <div class="seg" role="group" aria-label="Анімація моторів">
-            <button type="button" data-mot="in" aria-pressed="false">Props In</button>
-            <button type="button" data-mot="out" aria-pressed="false">Props Out (реверс)</button>
+          <div class="demo-h"><h3>Мотори й пропелери</h3><span class="ro" id="motRo">зупинені</span></div>
+          <div class="seg" role="group" aria-label="Як стоять пропелери">
+            <button type="button" data-mot="in" aria-pressed="false">Пропи до камери · Props In</button>
+            <button type="button" data-mot="out" aria-pressed="false">Пропи від камери · Props Out</button>
+            <button type="button" data-mot="wrong" aria-pressed="false">Неправильно встановлені</button>
+          </div>
+          <div class="mot-bad" id="motBad" hidden>
+            <div class="seg sm" role="group" aria-label="Яка помилка"><button type="button" data-mot="bk:dir">Проп не того напряму</button><button type="button" data-mot="bk:flip">Проп догори дриґом</button></div>
+            <div class="seg sm" id="motBadM" role="group" aria-label="На якому моторі"></div>
+          </div>
+          <div class="seg" role="group" aria-label="Дії з моторами">
+            <button type="button" data-mot="takeoff" aria-pressed="false">Спробувати зліт</button>
+            <button type="button" data-mot="flow" aria-pressed="true">Потік повітря</button>
             <button type="button" data-mot="test" aria-pressed="false">Тест 1→2→3→4</button>
             <button type="button" data-mot="stop" aria-pressed="false">Стоп</button>
           </div>
